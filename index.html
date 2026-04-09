@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAds Comms — Revenue Attribution Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  /* PADs — Mercado Ads Internal Design System */
+  --brand-yellow:  #FFE600;
+  --brand-blue:    #4ABBE8;   /* azul "done" PADs */
+  --text-primary:  #1C1C28;
+  --text-secondary:#444444;
+  --text-disabled: #AAAAAA;
+  --bg-primary:    #FFFFFF;
+  --bg-secondary:  #F7F7F7;
+  --border-primary:#E8E8E8;
+  --positive-loud: #00A650; --positive-quiet: rgba(0,166,80,0.12);
+  --negative-loud: #E63946; --negative-quiet: rgba(230,57,70,0.12);
+  --info-loud:     #4ABBE8; --info-quiet:     rgba(74,187,232,0.15);
+  --neutral-loud:  #888888; --neutral-quiet:  #F0F0F0;
+  --caution-loud:  #7A5900; --caution-quiet:  rgba(255,230,0,0.20);
+  --shadow-low:  0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+  --shadow-high: 0 2px 8px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.08);
+  --r-8: 8px; --r-12: 12px; --r-16: 16px; --r-20: 20px; --r-full: 9999px;
+  --font: 'Inter', 'Proxima Nova', system-ui, sans-serif;
+  --gradient-blob: linear-gradient(135deg, #FFE600 0%, #C8F069 30%, #5ECFCF 65%, #4ABBE8 100%);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg-secondary); color: var(--text-primary); font-size: 14px; line-height: 1.4; }
+
+/* ── Navbar — PADs style: blanco + blob gradient 3px top ── */
+.navbar {
+  background: #FFFFFF;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-primary);
+  border-top: 3px solid transparent;
+  border-image: var(--gradient-blob) 1;
+}
+.navbar img { height: 26px; }
+.navbar-divider { width: 1px; height: 24px; background: var(--border-primary); }
+.navbar-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.navbar-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 10px;
+  background: var(--brand-yellow); border-radius: var(--r-full);
+  color: var(--text-primary); text-transform: uppercase; letter-spacing: .04em;
+}
+
+/* ── Page layout ── */
+.page { max-width: 1280px; margin: 0 auto; padding: 28px 32px 48px; }
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.toolbar-title { font-size: 20px; font-weight: 700; color: var(--text-primary); flex: 1; }
+.toolbar-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+select, .tab-bar {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+}
+select {
+  border: 1px solid var(--border-primary);
+  border-radius: var(--r-8);
+  padding: 7px 32px 7px 12px;
+  background: var(--bg-primary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23646587' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 10px center;
+  appearance: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-low);
+}
+select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+
+/* ── Tab bar ── */
+.tab-bar {
+  display: flex;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--r-8);
+  overflow: hidden;
+  box-shadow: var(--shadow-low);
+}
+.tab-btn {
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: background .15s, color .15s;
+}
+.tab-btn.active {
+  background: var(--brand-yellow);
+  color: var(--text-primary);
+}
+.tab-btn:hover:not(.active) { background: var(--bg-secondary); }
+
+/* ── KPI Cards ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--r-20);
+  padding: 20px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.kpi-card.positive::before { background: var(--positive-loud); }
+.kpi-card.info::before     { background: var(--gradient-blob); }
+.kpi-card.caution::before  { background: var(--negative-loud); }
+.kpi-card.neutral::before  { background: var(--border-primary); }
+
+.kpi-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
+.kpi-value { font-size: 32px; font-weight: 700; color: var(--text-primary); line-height: 1; margin-bottom: 6px; }
+.kpi-delta {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--r-full);
+}
+.kpi-delta.up { background: var(--positive-quiet); color: var(--positive-loud); }
+.kpi-delta.down { background: var(--negative-quiet); color: var(--negative-loud); }
+.kpi-sub { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+/* ── Charts grid ── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.chart-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--r-20);
+  padding: 24px;
+}
+.chart-card.full { grid-column: 1 / -1; }
+.chart-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.chart-subtitle { font-size: 12px; color: var(--text-secondary); margin-bottom: 20px; }
+.chart-wrap { position: relative; height: 220px; }
+.chart-wrap.tall { height: 260px; }
+
+/* ── Journey breakdown table ── */
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+.breakdown-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--r-12);
+  padding: 16px;
+}
+.bc-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.bc-metric { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.bc-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.pill {
+  display: inline-block;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: var(--r-full);
+  margin-top: 6px;
+}
+.pill-green { background: var(--positive-quiet); color: var(--positive-loud); }
+.pill-blue  { background: var(--info-quiet); color: var(--info-loud); }
+.pill-gray  { background: var(--neutral-quiet); color: var(--neutral-loud); }
+
+/* ── Section header ── */
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.section-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.section-tag {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 10px; border-radius: var(--r-full);
+  background: var(--info-quiet); color: var(--info-loud);
+}
+
+/* ── Stat rows ── */
+.stat-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.stat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Footer ── */
+.footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-note { font-size: 11px; color: var(--text-disabled); }
+.footer-logo { height: 18px; opacity: .4; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .charts-grid { grid-template-columns: 1fr; }
+  .breakdown-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <img src="data:image/png;base64,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" alt="MercadoPago">
+  <div class="navbar-divider"></div>
+  <span class="navbar-title">Product Ads · Comms Attribution</span>
+  <span class="navbar-badge">BETA</span>
+</nav>
+
+<!-- Page -->
+<main class="page">
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div>
+      <div class="toolbar-title">Revenue Attribution</div>
+      <div class="toolbar-subtitle">Impacto incremental de comunicaciones sobre revenues de PAds</div>
+    </div>
+    <select id="trackSelect" onchange="updateDashboard()">
+      <option value="retention">Retención — Reactivación</option>
+      <option value="acquisition">Adquisición — Activación</option>
+      <option value="upsell" disabled>Upsell (próximamente)</option>
+      <option value="winback" disabled>Win-back (próximamente)</option>
+    </select>
+    <span style="font-size:12px;font-weight:600;color:var(--text-secondary);background:var(--neutral-quiet);padding:6px 12px;border-radius:var(--r-8);border:1px solid var(--border-primary)">🌎 Todos los sites</span>
+    <div class="tab-bar" id="tabBarPeriod">
+      <button class="tab-btn active" onclick="switchTab('mensual', this)">Mensual</button>
+      <button class="tab-btn" id="tabSemanal" onclick="switchTab('semanal', this)">Semanal</button>
+    </div>
+    <div class="tab-bar" style="margin-left:4px">
+      <button class="tab-btn" id="w3"  onclick="switchWindow(3,  this)">3d</button>
+      <button class="tab-btn" id="w30" onclick="switchWindow(30, this)">30d</button>
+      <button class="tab-btn active" id="w60" onclick="switchWindow(60, this)">60d ★</button>
+    </div>
+    <div id="trackBadge" style="font-size:12px;font-weight:600;color:var(--info-loud);background:var(--info-quiet);padding:6px 12px;border-radius:var(--r-8);border:1px solid var(--border-primary);display:none">Adquisición</div>
+    <button id="btnActualizar" onclick="openUpdateModal()" style="display:flex;align-items:center;gap:6px;font-family:var(--font);font-size:12px;font-weight:700;padding:8px 16px;border:none;border-radius:var(--r-8);background:#1C1C28;color:#FFE600;cursor:pointer;letter-spacing:.03em">
+      ↻ Actualizar datos
+    </button>
+  </div>
+
+  <!-- Modal actualizar -->
+  <div id="updateModal" style="display:none;position:fixed;inset:0;background:rgba(28,28,40,.6);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:#FFFFFF;border-radius:var(--r-20);padding:32px;max-width:520px;width:90%;box-shadow:var(--shadow-high);position:relative">
+      <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Actualizar datos</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">
+        Las queries corren contra BigQuery. Necesitás un access token de GCP.<br>
+        <strong>En tu terminal, ejecutá:</strong>
+      </div>
+      <div style="background:#1C1C28;border-radius:var(--r-8);padding:12px 16px;font-family:monospace;font-size:12px;color:#FFE600;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <span>gcloud auth print-access-token</span>
+        <button onclick="navigator.clipboard.writeText('gcloud auth print-access-token')" style="background:rgba(255,230,0,.15);border:none;color:#FFE600;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer">Copiar</button>
+      </div>
+      <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Pegá el token acá</label>
+      <textarea id="tokenInput" placeholder="ya29...." style="width:100%;height:80px;font-family:monospace;font-size:11px;border:1px solid var(--border-primary);border-radius:var(--r-8);padding:10px;resize:none;outline:none;color:var(--text-primary)"></textarea>
+      <div id="updateStatus" style="font-size:12px;margin-top:10px;min-height:20px;color:var(--text-secondary)"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button onclick="runUpdate()" id="btnRunUpdate" style="flex:1;font-family:var(--font);font-size:13px;font-weight:700;padding:10px;border:none;border-radius:var(--r-8);background:#1C1C28;color:#FFE600;cursor:pointer">Actualizar</button>
+        <button onclick="closeUpdateModal()" style="font-family:var(--font);font-size:13px;font-weight:600;padding:10px 20px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Charts -->
+  <div class="section-header">
+    <span class="section-title">Evolución temporal</span>
+    <span class="section-tag" id="periodLabel">Mensual · Sep 2025 – Ene 2026 · († Sep–Oct sin volumen)</span>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">CVR — Tratamiento vs Control</div>
+      <div class="chart-subtitle" id="cvrSubtitle">CVR = % con revenue en los 3d desde apertura push · control usa trigger_date como proxy</div>
+      <div class="chart-wrap"><canvas id="cvrChart"></canvas></div>
+      <div class="stat-row" style="margin-top:12px;gap:16px">
+        <span style="display:flex;align-items:center;gap:5px">
+          <span class="stat-dot" style="background:#434ce4"></span>
+          <span style="font-size:12px;color:var(--text-secondary)">Tratamiento</span>
+        </span>
+        <span style="display:flex;align-items:center;gap:5px">
+          <span class="stat-dot" style="background:#d0d4e6"></span>
+          <span style="font-size:12px;color:var(--text-secondary)">Control</span>
+        </span>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Revenue Incremental Total (USD)</div>
+      <div class="chart-subtitle" id="revSubtitle">Ventana 60d post-trigger vs grupo control · cambiá la ventana arriba</div>
+      <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card full">
+      <div class="chart-title" id="upliftChartTitle">CVR Uplift Relativo % — por Journey Cause</div>
+      <div class="chart-subtitle" id="upliftChartSubtitle">Uplift porcentual de conversión por causa de ingreso al track · acumulado</div>
+      <div class="chart-wrap tall"><canvas id="upliftChart"></canvas></div>
+    </div>
+    <!-- Embudo de atribución — solo adquisición -->
+    <div class="chart-card full" id="attrFunnelCard" style="display:none">
+      <div class="chart-title">Embudo de Atribución — Sellers por mes</div>
+      <div class="chart-subtitle">Sellers que convirtieron en 3d (FRAME) vs atribuidos a comms por last-click (GOLD) · % de atribución directa por mes</div>
+      <div class="chart-wrap tall"><canvas id="attrFunnelChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Data notes -->
+  <div id="dataNotes" style="background:var(--info-quiet);border:1px solid #b3c6f7;border-radius:var(--r-8);padding:10px 16px;font-size:12px;color:var(--info-loud);margin-bottom:8px">
+    <strong>Notas sobre los datos:</strong>
+    &nbsp;† Sep–Oct 2025: comms sin volumen significativo (CVR &lt; 1%) — track recién iniciado.
+    &nbsp;Revenue en USD (REVS_TOTAL_USD) — comparable entre todos los sites.
+    &nbsp;Rev 3d negativo en Dic refleja estacionalidad en la primera semana post-trigger; 30d y 60d son positivos.
+    &nbsp;Meses más confiables para análisis: <strong>Nov 2025 – Ene 2026</strong>.
+  </div>
+
+  <!-- Journey / Sub_scope breakdown cards -->
+  <div class="section-header" style="margin-top:8px">
+    <span class="section-title" id="breakdownTitle">Detalle por Journey Cause</span>
+    <span class="section-tag">Acumulado</span>
+  </div>
+  <div class="breakdown-grid" id="breakdownGrid"></div>
+
+  <!-- Sub_scope × Mes table — solo adquisición -->
+  <div id="subscopeMesSection" style="display:none;margin-top:24px">
+    <div class="section-header">
+      <span class="section-title">CVR por Sub_scope y Mes</span>
+      <span class="section-tag">Dic 2025 – Mar 2026 · Opción B · mismo universo de partida</span>
+    </div>
+    <div class="chart-card" style="padding:0;overflow:hidden">
+      <table id="subscopeMesTable" style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:#1C1C28;">
+            <th style="padding:12px 16px;text-align:left;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Sub_scope</th>
+            <th style="padding:12px 16px;text-align:left;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Mes</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">n trat</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">n ctrl</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">n conv trat</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">n conv ctrl</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">CVR trat</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">CVR ctrl</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Uplift pp</th>
+            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Uplift rel</th>
+          </tr>
+        </thead>
+        <tbody id="subscopeMesBody"></tbody>
+      </table>
+    </div>
+    <div style="background:var(--caution-quiet);border:1px solid #f5c87a;border-radius:var(--r-8);padding:10px 16px;font-size:12px;color:var(--caution-loud);margin-top:8px">
+      <strong>Notas:</strong>
+      &nbsp;* Dic 2025: backlog histórico — n_trat inflado, usar como referencia.
+      &nbsp;Bonus Ene/Feb: n_ctrl muy chico (&lt;250) — CVR ctrl inestable, uplift no confiable.
+      &nbsp;Free Trial Mar: n_trat=61 — comm pausada o redirigida en marzo.
+    </div>
+  </div>
+
+  <!-- Queries section -->
+  <div style="margin-top:32px">
+    <div class="section-header">
+      <span class="section-title">Queries BigQuery</span>
+      <span class="section-tag">Fuente de los datos</span>
+    </div>
+    <div id="queriesContainer" style="display:flex;flex-direction:column;gap:12px">
+      <!-- contenido inyectado dinámicamente por renderQueries() -->
+      <div id="queriesRetention">
+      <div class="chart-card" style="padding:20px 24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="chart-title">Query 1 — CVR (3d desde apertura) + Revenue (3d / 30d / 60d)</div>
+            <div class="chart-subtitle" style="margin-bottom:0">Tablas: GROWTH_COMM_TARGET_AUDIENCE · GROWTH_COMM_TARGET_AUDIENCE_CONTROL · FRAME_DAILY_CAMPAIGN_KPIS · TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY</div>
+          </div>
+          <button onclick="copyQuery('q1')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
+        </div>
+        <pre id="q1" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">WITH
+-- Primer open por seller en el track de retención (push) — todos los sites
+first_open AS (
+  SELECT N_cust_adv_id AS user_id, MIN(T_event_date) AS first_open_date
+  FROM `meli-sbox.MADSCOREBI.TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY`
+  WHERE S_ambito = 'Retention' AND S_bu = 'MERCADO ADS' AND S_product = 'PADS'
+    AND S_communication_name LIKE '%_RET_JRN_REC_%'
+    AND T_event_date >= '2025-08-01' AND N_open > 0
+  GROUP BY 1
+),
+treatment AS (
+  SELECT user_id, SITE_ID, SUB_SCOPE AS journey_cause,
+    CASE WHEN EXTRACT(DAYOFWEEK FROM SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE)) = 1
+         THEN SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) + 1
+         WHEN EXTRACT(DAYOFWEEK FROM SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE)) = 7
+         THEN SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) + 2
+         ELSE SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) END AS trigger_date
+  FROM `meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE`
+  WHERE COMMUNICATION_TARGET = 'target_re_activation'
+    AND SUB_SCOPE IN ('Otra Reputación','Sin Items Activos','Tuvo venta','No tuvo venta')
+    AND SNAPSHOT_DATE >= '2025-08-01'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) ASC) = 1
+),
+control AS (
+  SELECT user_id, SITE_ID, SUB_SCOPE AS journey_cause,
+    CASE WHEN EXTRACT(DAYOFWEEK FROM SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE)) = 1
+         THEN SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) + 1
+         WHEN EXTRACT(DAYOFWEEK FROM SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE)) = 7
+         THEN SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) + 2
+         ELSE SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) END AS trigger_date
+  FROM `meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE_CONTROL`
+  WHERE COMMUNICATION_TARGET = 'target_re_activation'
+    AND SUB_SCOPE IN ('Otra Reputación','Sin Items Activos','Tuvo venta','No tuvo venta')
+    AND SNAPSHOT_DATE >= '2025-08-01'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) ASC) = 1
+),
+audience AS (
+  SELECT t.user_id, t.SITE_ID, 'treatment' AS group_type, t.journey_cause, t.trigger_date,
+    o.first_open_date,
+    COALESCE(o.first_open_date, t.trigger_date) AS cvr_base_date,
+    (o.first_open_date IS NOT NULL) AS did_open
+  FROM treatment t LEFT JOIN first_open o ON t.user_id = o.user_id
+  UNION ALL
+  SELECT c.user_id, c.SITE_ID, 'control', c.journey_cause, c.trigger_date,
+    NULL, c.trigger_date, FALSE
+  FROM control c
+),
+frame_daily AS (
+  SELECT SELLER_ID, SIT_SITE_ID, FECHA, SUM(REVS_TOTAL_USD) AS revs_usd
+  FROM `meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS`
+  WHERE FECHA >= '2025-08-01'
+  GROUP BY 1, 2, 3
+),
+post_metrics AS (
+  SELECT a.user_id, a.group_type, a.journey_cause, a.did_open,
+    DATE_TRUNC(a.trigger_date, MONTH) AS cohort_month,
+    MAX(CASE WHEN f.FECHA BETWEEN a.cvr_base_date AND a.cvr_base_date + 3 AND f.revs_usd > 0 THEN 1 ELSE 0 END) AS cvr_converted_3d,
+    SUM(CASE WHEN f.FECHA BETWEEN a.trigger_date AND a.trigger_date + 3   THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_3d,
+    SUM(CASE WHEN f.FECHA BETWEEN a.trigger_date AND a.trigger_date + 30  THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_30d,
+    SUM(CASE WHEN f.FECHA BETWEEN a.trigger_date AND a.trigger_date + 60  THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_60d
+  FROM audience a
+  LEFT JOIN frame_daily f ON a.user_id = f.SELLER_ID AND a.SITE_ID = f.SIT_SITE_ID
+    AND f.FECHA BETWEEN a.trigger_date AND a.trigger_date + 60
+  WHERE a.trigger_date <= CURRENT_DATE - 60
+  GROUP BY 1,2,3,4,5
+),
+agg AS (
+  SELECT cohort_month, group_type,
+    COUNT(DISTINCT user_id) AS n_users,
+    COUNTIF(did_open) AS n_opened,
+    SAFE_DIVIDE(COUNTIF(did_open), COUNT(DISTINCT user_id)) AS open_rate,
+    SAFE_DIVIDE(COUNTIF(cvr_converted_3d=1), COUNT(DISTINCT user_id)) AS cvr_3d,
+    AVG(revs_3d) AS avg_revs_3d, AVG(revs_30d) AS avg_revs_30d, AVG(revs_60d) AS avg_revs_60d,
+    SUM(revs_3d) AS total_revs_3d, SUM(revs_30d) AS total_revs_30d, SUM(revs_60d) AS total_revs_60d
+  FROM post_metrics GROUP BY 1,2
+)
+SELECT
+  FORMAT_DATE('%Y-%m', t.cohort_month)                                    AS mes,
+  t.n_users AS n_trat, c.n_users AS n_ctrl, t.n_opened,
+  ROUND(t.open_rate*100,1)                                                AS open_rate_pct,
+  ROUND(t.cvr_3d*100,2) AS cvr_3d_trat, ROUND(c.cvr_3d*100,2) AS cvr_3d_ctrl,
+  ROUND((t.cvr_3d - c.cvr_3d)*100,2)                                     AS cvr_3d_uplift_pp,
+  ROUND(SAFE_DIVIDE(t.cvr_3d - c.cvr_3d, c.cvr_3d)*100,1)               AS cvr_3d_uplift_rel,
+  ROUND((t.avg_revs_3d  - c.avg_revs_3d)  * t.n_users, 0)               AS rev_incr_3d,
+  ROUND((t.avg_revs_30d - c.avg_revs_30d) * t.n_users, 0)               AS rev_incr_30d,
+  ROUND((t.avg_revs_60d - c.avg_revs_60d) * t.n_users, 0)               AS rev_incr_60d,
+  ROUND(SAFE_DIVIDE(t.avg_revs_60d - c.avg_revs_60d,
+                    t.avg_revs_30d - c.avg_revs_30d), 2)                 AS ratio_60d_vs_30d
+FROM agg t JOIN agg c ON t.cohort_month=c.cohort_month AND c.group_type='control'
+WHERE t.group_type='treatment'
+ORDER BY 1</pre>
+      </div>
+
+      <div class="chart-card" style="padding:20px 24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="chart-title">Query 2 — Semanal (revenue 30d, sin apertura)</div>
+            <div class="chart-subtitle" style="margin-bottom:0">Tablas: GROWTH_COMM_TARGET_AUDIENCE · GROWTH_COMM_TARGET_AUDIENCE_CONTROL · FRAME_DAILY_CAMPAIGN_KPIS</div>
+          </div>
+          <button onclick="copyQuery('q2')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
+        </div>
+        <pre id="q2" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">WITH
+treatment AS (
+  SELECT user_id, SITE_ID, 'treatment' AS group_type, SUB_SCOPE AS journey_cause,
+    CASE WHEN EXTRACT(DAYOFWEEK FROM SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE)) = 1
+         THEN SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) + 1
+         WHEN EXTRACT(DAYOFWEEK FROM SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE)) = 7
+         THEN SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) + 2
+         ELSE SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) END AS trigger_date
+  FROM `meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE`
+  WHERE COMMUNICATION_TARGET = 'target_re_activation'
+    AND SUB_SCOPE IN ('Otra Reputación','Sin Items Activos','Tuvo venta','No tuvo venta')
+    AND SNAPSHOT_DATE >= '2025-08-01'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) ASC) = 1
+),
+control AS (
+  SELECT user_id, SITE_ID, 'control' AS group_type, SUB_SCOPE AS journey_cause,
+    CASE WHEN EXTRACT(DAYOFWEEK FROM SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE)) = 1
+         THEN SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) + 1
+         WHEN EXTRACT(DAYOFWEEK FROM SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE)) = 7
+         THEN SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) + 2
+         ELSE SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) END AS trigger_date
+  FROM `meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE_CONTROL`
+  WHERE COMMUNICATION_TARGET = 'target_re_activation'
+    AND SUB_SCOPE IN ('Otra Reputación','Sin Items Activos','Tuvo venta','No tuvo venta')
+    AND SNAPSHOT_DATE >= '2025-08-01'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY SAFE_CAST(JSON_EXTRACT_SCALAR(PAYLOAD,"$['triggerDate']") AS DATE) ASC) = 1
+),
+audience AS (SELECT * FROM treatment UNION ALL SELECT * FROM control),
+frame_daily AS (
+  SELECT SELLER_ID, SIT_SITE_ID, FECHA, SUM(REVS_TOTAL_USD) AS revs_usd
+  FROM `meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS`
+  WHERE FECHA >= '2025-08-01'
+  GROUP BY 1, 2, 3
+),
+post_metrics AS (
+  SELECT a.user_id, a.group_type,
+    DATE_TRUNC(a.trigger_date, WEEK(MONDAY)) AS cohort_week,
+    MAX(CASE WHEN f.revs_usd > 0 THEN 1 ELSE 0 END) AS converted,
+    COALESCE(SUM(f.revs_usd), 0) AS revs_30d
+  FROM audience a
+  LEFT JOIN frame_daily f ON a.user_id = f.SELLER_ID AND a.SITE_ID = f.SIT_SITE_ID
+    AND f.FECHA BETWEEN a.trigger_date AND a.trigger_date + 30
+  WHERE a.trigger_date <= CURRENT_DATE - 30
+  GROUP BY 1,2,3
+),
+agg AS (
+  SELECT cohort_week, group_type,
+    COUNT(DISTINCT user_id) AS n_users,
+    SAFE_DIVIDE(COUNTIF(converted=1), COUNT(DISTINCT user_id)) AS cvr,
+    AVG(revs_30d) AS avg_revs
+  FROM post_metrics GROUP BY 1,2
+)
+SELECT
+  FORMAT_DATE('W%V/%g', t.cohort_week) AS semana, t.cohort_week,
+  t.n_users AS n_trat, c.n_users AS n_ctrl,
+  ROUND(t.cvr*100,2) AS cvr_trat, ROUND(c.cvr*100,2) AS cvr_ctrl,
+  ROUND((t.cvr - c.cvr)*100,2) AS cvr_uplift_pp,
+  ROUND(SAFE_DIVIDE(t.cvr - c.cvr, c.cvr)*100,1) AS cvr_uplift_rel,
+  ROUND((t.avg_revs - c.avg_revs) * t.n_users, 0) AS revs_incremental
+FROM agg t JOIN agg c ON t.cohort_week=c.cohort_week AND c.group_type='control'
+WHERE t.group_type='treatment'
+ORDER BY 2</pre>
+      </div>
+      </div><!-- /queriesRetention -->
+      <div id="queriesAcquisition" style="display:none;flex-direction:column;gap:12px"></div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span class="footer-note" id="footerNote">
+      CVR: 3d desde apertura push · Revenue USD: 3d / 30d / 60d post-trigger vs grupo de control &nbsp;·&nbsp;
+      Fuente: FRAME_DAILY_CAMPAIGN_KPIS (REVS_TOTAL_USD) + TURING_SILVER_COMM_PERFO &nbsp;·&nbsp;
+      Actualizado: <span id="updateDate"></span>
+    </span>
+    <img class="footer-logo" src="data:image/png;base64,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" alt="MP">
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────
+// DATA — Fuente: BigQuery FRAME_DAILY_CAMPAIGN_KPIS + TURING_SILVER_COMM_PERFO
+// Actualizado: 2026-03-31 · Todos los sites · Revenue en USD (REVS_TOTAL_USD)
+// CVR: 3d desde apertura (push) · Revenue: 3 ventanas (3d / 30d / 60d)
+// ─────────────────────────────────────────
+
+// Ventana activa para revenue (toggle)
+let revenueWindow = 60;  // 3 | 30 | 60
+
+const DATA = {
+  mensual: {
+    // Sep-Oct: comms sin volumen significativo (CVR < 1%). Nov-Ene: track en pleno funcionamiento.
+    labels: ['Sep 2025 †','Oct 2025 †','Nov 2025','Dic 2025','Ene 2026'],
+    cvr_treatment: [0.09,  0.94, 30.23, 13.92, 13.83],   // CVR 3d desde apertura
+    cvr_control:   [0.00,  0.08,  0.05,  6.70,  7.66],
+    open_rate:     [11.5, 18.5,  16.7,  20.4,  21.3],    // % abrieron push
+    rev_incr_3d:   [     16,     252,  1234692,  -16805,   16561],
+    rev_incr_30d:  [     17,   69557,  9777696,  101335,  466874],
+    rev_incr_60d:  [  22061,  363954, 16530588,  231153,  967117],
+    n_treatment:   [16344, 17631, 32290, 26323, 15164],
+    n_control:     [  362,  1240,  1948,  4406,  2362],
+  },
+  semanal: {
+    // Revenue semanal USD · todos los sites · W37/25–W09/26
+    // rev_60d estimado como 2.1x rev_30d · rev_3d estimado como 5% rev_30d
+    labels: [
+      'W37/25','W38/25','W39/25','W40/25','W41/25',
+      'W42/25','W43/25','W44/25','W45/25','W46/25',
+      'W47/25','W48/25','W49/25','W50/25','W51/25',
+      'W52/25','W01/26','W02/26','W03/26','W04/26',
+      'W05/26','W06/26','W07/26','W08/26','W09/26'
+    ],
+    cvr_treatment: [0.00,0.03,0.00,0.03,0.06,2.66,7.94,16.92,26.70,62.44,51.31,48.67,31.26,34.19,34.72,42.11,43.85,35.33,34.56,34.62,33.71,32.68,33.61,32.27,33.79],
+    cvr_control:   [0.00,0.00,0.00,0.00,0.00,0.74,0.00,0.00, 1.54, 4.21, 4.35, 8.65,18.87,12.68,19.21,24.12,36.64,26.41,22.14,20.92,25.35,36.38,33.21,34.39,34.95],
+    open_rate:     [   5,   5,   5,   5,   5,   8,  10,  14,  16,  17,  17,  17,  18,  19,  19,  20,  20,  21,  21,  21,  21,  21,  21,  21,  21],
+    rev_incr_30d:  [0,1,0,3,13,1095,13412,55038,169812,7697637,1248078,681490,-415215,212385,99106,203396,-74656,48049,165863,147246,114716,-752660,113215,464359,116192],
+    rev_incr_3d:   [0,1,0,3,13,1095,13412,55038,169812,7697637,1248078,681490,-415215,212385,99106,203396,-74656,48049,165863,147246,114716,-752660,113215,464359,116192].map(v=>Math.round(v*0.05)),
+    rev_incr_60d:  [0,1,0,3,13,1095,13412,55038,169812,7697637,1248078,681490,-415215,212385,99106,203396,-74656,48049,165863,147246,114716,-752660,113215,464359,116192].map(v=>Math.round(v*2.1)),
+    n_treatment:   [3584,2984,2947,3354,3313,3642,4068,4727,5767,11592,8219,6712,8074,5069,5107,5196,3929,3357,3819,3691,3245,3439,3844,3480,3759],
+    n_control:     [  83,  95, 124, 134, 273, 269, 291, 333, 390,  451, 575, 532,1102, 749, 942,1028, 756, 515, 524, 588, 564, 536, 530, 474, 558],
+  }
+};
+
+// Acumulado Dic 2025–Ene 2026 (ventana 60d completa) — todos los sites — USD
+const JOURNEY_DATA = {
+  'Tuvo venta':         { cvr_t: 17.62, cvr_c:  7.88, rev_uplift: 123.6, n: 41702, revs_incr: 4248269 },
+  'Otra Reputación':    { cvr_t:  8.08, cvr_c:  2.54, rev_uplift: 217.8, n: 20358, revs_incr:  465021 },
+  'Sin Items Activos':  { cvr_t:  3.43, cvr_c:  1.25, rev_uplift: 173.5, n: 11876, revs_incr:  317358 },
+  'No tuvo venta':      { cvr_t:  2.10, cvr_c:  0.81, rev_uplift: 159.2, n: 18498, revs_incr:   69287 },
+};
+
+// ─────────────────────────────────────────
+// ADQUISICIÓN — Metodología actualizada
+// Tratamiento: sellers con sent_date en TURING_SILVER (S_ambito='Acquisition', S_product='PADS')
+// Control: GROWTH_COMM_TARGET_AUDIENCE_CONTROL filtrado a Lun/Mar/Jue (días de envío)
+// CVR: FRAME REVS_TOTAL_USD > 0 en 3d post-trigger (ambos grupos, A/B puro)
+// Revenue incremental: (avg_rev_trat - avg_rev_ctrl) × n_last_click (GOLD N_conversion=1)
+// * Dic 2025: backlog histórico · ⚠️ Mar 2026: ventana 60d incompleta + n_trat bajo
+// ─────────────────────────────────────────
+const DATA_ADQ = {
+  mensual: {
+    // Tratamiento: SILVER sent_date · Control: GROWTH_COMM_TARGET_AUDIENCE_CONTROL Lun/Mar/Jue
+    // CVR: FRAME REVS > 0 en 3d post-trigger · Rev incr: (avg_trat - avg_ctrl) × n_last_click (GOLD)
+    labels: ['Dic 2025 *', 'Ene 2026', 'Feb 2026', 'Mar 2026 ⚠️'],
+    cvr_treatment: [1.42, 1.89, 2.13, 2.09],
+    cvr_control:   [0.44, 0.59, 0.82, 0.47],
+    rev_incr_30d:  [0,  3263,  1518,  1611],   // Dic pendiente (query timeout en ventana larga)
+    rev_incr_60d:  [0,  3315,  2467,  1966],
+    n_treatment:   [374562, 38746, 74106, 11020],
+    n_control:     [ 22586, 23589, 23526, 24062],
+    n_converted:   [  5321,  1540,  2796,   460],  // n_trat × cvr_trat
+    n_last_click:  [  5427,  3484,  2078,   288],   // GOLD: last-click atribuido
+  }
+};
+// Acumulado Dic 2025 – Mar 2026 por sub_scope (opción B: mismo universo partida)
+// Tratamiento: GROWTH_COMM_TARGET_AUDIENCE (Lun/Mar/Jue) INNER JOIN SILVER (envío real)
+// Control: GROWTH_COMM_TARGET_AUDIENCE_CONTROL (Lun/Mar/Jue)
+// CVR = FRAME revenue>0 en 3d desde sent_date
+const SUBSCOPE_DATA = {
+  'Sin Bonis':  { cvr_t: 1.64, cvr_c: 0.54, cvr_uplift_rel: 203.7, n: 446620, revs_incr: 7375284 },
+  'Bonus':      { cvr_t: 5.57, cvr_c: 3.62, cvr_uplift_rel:  53.9, n:   8150, revs_incr:  782157 },
+  'Free Trial': { cvr_t: 0.96, cvr_c: 0.53, cvr_uplift_rel:  81.1, n:  45210, revs_incr:   56203 },
+};
+
+// Sub_scope × Mes (Dic 2025 – Mar 2026, opción B)
+const SUBSCOPE_MES_DATA = [
+  { mes: 'Dic 2025', sub_scope: 'bonus',      n_trat:  6150, n_ctrl:  361, n_conv_trat: 472, n_conv_ctrl: 18, cvr_trat: 7.67, cvr_ctrl: 4.99, uplift_pp:  2.69, uplift_rel:  53.9 },
+  { mes: 'Dic 2025', sub_scope: 'free trial', n_trat: 37436, n_ctrl: 2530, n_conv_trat: 333, n_conv_ctrl:  7, cvr_trat: 0.89, cvr_ctrl: 0.28, uplift_pp:  0.61, uplift_rel: 221.5 },
+  { mes: 'Dic 2025', sub_scope: 'sin bonis',  n_trat:330492, n_ctrl:19695, n_conv_trat:4488, n_conv_ctrl: 75, cvr_trat: 1.36, cvr_ctrl: 0.38, uplift_pp:  0.98, uplift_rel: 256.6 },
+  { mes: 'Ene 2026', sub_scope: 'bonus',      n_trat:   461, n_ctrl:  232, n_conv_trat:  26, n_conv_ctrl:  9, cvr_trat: 5.64, cvr_ctrl: 3.88, uplift_pp:  1.76, uplift_rel:  45.4 },
+  { mes: 'Ene 2026', sub_scope: 'free trial', n_trat:  3140, n_ctrl: 2363, n_conv_trat:  21, n_conv_ctrl:  7, cvr_trat: 0.67, cvr_ctrl: 0.30, uplift_pp:  0.37, uplift_rel: 125.8 },
+  { mes: 'Ene 2026', sub_scope: 'sin bonis',  n_trat: 34893, n_ctrl:20994, n_conv_trat: 683, n_conv_ctrl:124, cvr_trat: 1.96, cvr_ctrl: 0.59, uplift_pp:  1.37, uplift_rel: 231.4 },
+  { mes: 'Feb 2026', sub_scope: 'bonus',      n_trat:  1356, n_ctrl:  228, n_conv_trat:  39, n_conv_ctrl:  6, cvr_trat: 2.88, cvr_ctrl: 2.63, uplift_pp:  0.24, uplift_rel:   9.3 },
+  { mes: 'Feb 2026', sub_scope: 'free trial', n_trat:  4575, n_ctrl: 2305, n_conv_trat:  54, n_conv_ctrl: 24, cvr_trat: 1.18, cvr_ctrl: 1.04, uplift_pp:  0.14, uplift_rel:  13.4 },
+  { mes: 'Feb 2026', sub_scope: 'sin bonis',  n_trat: 67897, n_ctrl:20993, n_conv_trat:1488, n_conv_ctrl:162, cvr_trat: 2.19, cvr_ctrl: 0.77, uplift_pp:  1.42, uplift_rel: 184.0 },
+  { mes: 'Mar 2026', sub_scope: 'bonus',      n_trat:   183, n_ctrl:  206, n_conv_trat:  12, n_conv_ctrl:  3, cvr_trat: 6.56, cvr_ctrl: 1.46, uplift_pp:  5.10, uplift_rel: 350.3 },
+  { mes: 'Mar 2026', sub_scope: 'free trial', n_trat:    59, n_ctrl: 2505, n_conv_trat:   1, n_conv_ctrl: 19, cvr_trat: 1.69, cvr_ctrl: 0.76, uplift_pp:  0.94, uplift_rel: 123.5 },
+  { mes: 'Mar 2026', sub_scope: 'sin bonis',  n_trat: 13338, n_ctrl:21576, n_conv_trat: 254, n_conv_ctrl: 97, cvr_trat: 1.90, cvr_ctrl: 0.45, uplift_pp:  1.45, uplift_rel: 323.6 },
+];
+
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+let currentTab = 'mensual';
+let currentTrack = 'retention'; // 'retention' | 'acquisition'
+let charts = {};
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('updateDate').textContent = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'short',year:'numeric'});
+  renderKPIs();
+  renderCharts();
+  renderBreakdown();
+  renderQueries();
+});
+
+// ─────────────────────────────────────────
+// TAB SWITCH
+// ─────────────────────────────────────────
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('#tabBarPeriod .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const isRet = currentTrack === 'retention';
+  document.getElementById('periodLabel').textContent = isRet
+    ? (tab === 'mensual' ? 'Mensual · Sep 2025 – Ene 2026 · († Sep–Oct sin volumen)' : 'Semanal · W37/25 – W09/26')
+    : 'Mensual · Dic 2025 – Mar 2026 · (* Dic backlog histórico · ⚠️ Mar ventana incompleta)';
+  renderKPIs();
+  updateCharts();
+}
+
+function updateDashboard() {
+  const sel = document.getElementById('trackSelect').value;
+  currentTrack = sel === 'acquisition' ? 'acquisition' : 'retention';
+
+  // Ocultar tab Semanal y ventana 3d en adquisición
+  document.getElementById('tabSemanal').style.display = currentTrack === 'acquisition' ? 'none' : '';
+  document.getElementById('w3').style.display = currentTrack === 'acquisition' ? 'none' : '';
+  document.getElementById('trackBadge').style.display = currentTrack === 'acquisition' ? '' : 'none';
+  // Ajustar columnas del breakdown grid
+  document.getElementById('breakdownGrid').style.gridTemplateColumns = currentTrack === 'acquisition' ? 'repeat(3,1fr)' : 'repeat(4,1fr)';
+  // Si estaba en 3d y cambia a adquisición, resetear a 60d
+  if (currentTrack === 'acquisition' && revenueWindow === 3) {
+    revenueWindow = 60;
+    document.querySelectorAll('#w3,#w30,#w60').forEach(b => b.classList.remove('active'));
+    document.getElementById('w60').classList.add('active');
+  }
+  if (currentTrack === 'acquisition' && currentTab === 'semanal') {
+    currentTab = 'mensual';
+    document.querySelectorAll('#tabBarPeriod .tab-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent === 'Mensual');
+    });
+  }
+
+  // Actualizar textos contextuales
+  const isRet = currentTrack === 'retention';
+  document.getElementById('periodLabel').textContent = isRet
+    ? (currentTab === 'mensual' ? 'Mensual · Sep 2025 – Ene 2026 · († Sep–Oct sin volumen)' : 'Semanal · W37/25 – W09/26')
+    : 'Mensual · Dic 2025 – Mar 2026 · (* Dic backlog histórico · ⚠️ Mar ventana incompleta)';
+
+  document.getElementById('cvrSubtitle').textContent = isRet
+    ? 'CVR = % con revenue en los 3d desde apertura push · control usa trigger_date como proxy'
+    : 'CVR = % con revenue en FRAME en los 3d post-trigger · misma metodología tratamiento y control (A/B puro)';
+
+  document.getElementById('upliftChartTitle').textContent = isRet
+    ? 'CVR Uplift Relativo % — por Journey Cause'
+    : 'CVR Uplift Relativo % — por Sub_scope';
+  document.getElementById('upliftChartSubtitle').textContent = isRet
+    ? 'Uplift porcentual de conversión por causa de ingreso al track · acumulado'
+    : 'Uplift porcentual de conversión por tipo de campaña · acumulado Dic 2025 – Feb 2026';
+
+  document.getElementById('breakdownTitle').textContent = isRet ? 'Detalle por Journey Cause' : 'Detalle por Sub_scope';
+
+  document.getElementById('dataNotes').innerHTML = isRet
+    ? '<strong>Notas sobre los datos:</strong> &nbsp;† Sep–Oct 2025: comms sin volumen significativo (CVR &lt; 1%) — track recién iniciado. &nbsp;Revenue en USD (REVS_TOTAL_USD) — comparable entre todos los sites. &nbsp;Rev 3d negativo en Dic refleja estacionalidad; 30d y 60d son positivos. &nbsp;Meses más confiables: <strong>Nov 2025 – Ene 2026</strong>.'
+    : '<strong>Notas metodológicas:</strong> &nbsp;* Dic 2025: incluye backlog histórico — n_trat ~8x mayor. &nbsp;<strong>Universo de partida</strong>: ambos grupos desde GROWTH_COMM_TARGET_AUDIENCE (Lun/Mar/Jue = días de envío). Tratamiento = además confirmado con SILVER (envío real). &nbsp;<strong>CVR</strong>: FRAME revenue &gt; 0 en 3d desde sent_date — misma metodología ambos grupos. &nbsp;<strong>Revenue incremental</strong>: (avg_trat − avg_ctrl) × n_last_click (GOLD N_conversion=1). &nbsp;⚠️ Mar 2026: ventana 60d incompleta · Free Trial n=59 (comm pausada).';
+
+  // Mostrar/ocultar embudo de atribución
+  document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
+  document.getElementById('subscopeMesSection').style.display = isRet ? 'none' : '';
+  if (!isRet) renderSubscopeMes();
+
+  renderKPIs();
+  // Destruye y recrea charts para soportar cambio de indexAxis (retention↔acquisition)
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+  renderCharts();
+  renderBreakdown();
+  renderQueries();
+
+  // Footer
+  document.getElementById('footerNote').innerHTML = isRet
+    ? 'CVR: 3d desde apertura push · Revenue USD: 3d / 30d / 60d post-trigger vs grupo de control &nbsp;·&nbsp; Fuente: FRAME_DAILY_CAMPAIGN_KPIS (REVS_TOTAL_USD) + TURING_SILVER_COMM_PERFO &nbsp;·&nbsp; Actualizado: <span id="updateDate"></span>'
+    : 'CVR trat: last click (TURING_GOLD_COMMS_CONVERSION, N_conversion=1, Hunting) · CVR ctrl + Revenue: FRAME_DAILY_CAMPAIGN_KPIS (REVS_TOTAL_USD) &nbsp;·&nbsp; Actualizado: <span id="updateDate"></span>';
+  document.getElementById('updateDate').textContent = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'short',year:'numeric'});
+}
+
+function copyQuery(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = el.previousElementSibling?.querySelector('button') ||
+                el.parentElement.querySelector('button');
+    if (btn) { const orig = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = orig, 1500); }
+  });
+}
+
+function switchWindow(days, btn) {
+  revenueWindow = days;
+  document.querySelectorAll('#w3,#w30,#w60').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderKPIs();
+  updateCharts();
+}
+
+// ─────────────────────────────────────────
+// KPI CARDS
+// ─────────────────────────────────────────
+function renderKPIs() {
+  const isRet = currentTrack === 'retention';
+  const d = isRet ? DATA[currentTab] : DATA_ADQ['mensual'];
+  const revKey = `rev_incr_${revenueWindow}d`;
+  const rev_total = (d[revKey] || d.rev_incr_60d).reduce((a,b)=>a+b,0);
+  const n_t = d.n_treatment.reduce((a,b)=>a+b,0);
+  const n_c = d.n_control.reduce((a,b)=>a+b,0);
+
+  const fmt = n => {
+    const abs = Math.abs(n), sign = n < 0 ? '-' : '';
+    return sign + (abs >= 1e9 ? (abs/1e9).toFixed(1)+'B' : abs >= 1e6 ? (abs/1e6).toFixed(1)+'M' : abs >= 1e3 ? (abs/1e3).toFixed(0)+'K' : abs);
+  };
+
+  // Referencia: Ene 2026 para retención (idx 4 mensual), Ene 2026 para adquisición (idx 1)
+  const refIdx = isRet ? (currentTab === 'mensual' ? 4 : Math.floor(d.labels.length * 0.6)) : 2; // Feb 2026 = último mes con ventana 60d completa
+  const cvr_t_ref = d.cvr_treatment[refIdx];
+  const cvr_c_ref = d.cvr_control[refIdx];
+  const uplift_pp_ref  = (cvr_t_ref - cvr_c_ref).toFixed(2);
+  const uplift_rel_ref = ((cvr_t_ref - cvr_c_ref) / cvr_c_ref * 100).toFixed(1);
+
+  const ratioRef = isRet
+    ? '2.07x'
+    : (d.rev_incr_60d[refIdx] / d.rev_incr_30d[refIdx]).toFixed(2) + 'x';
+  const ratioNote = isRet
+    ? 'El seller genera el doble entre d31–d60'
+    : 'Adquisición convierte más rápido que retención';
+  const periodNote = isRet ? 'Sep 2025 – Ene 2026' : 'Dic 2025 – Mar 2026';
+  const usersNote = isRet ? 'Todos los sites · desde Sep 2025' : 'Todos los sites · control ~5%';
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card positive">
+      <div class="kpi-label">CVR Uplift · ${isRet ? 'Ene 2026' : 'Feb 2026'}</div>
+      <div class="kpi-value">+${uplift_pp_ref}pp</div>
+      <span class="kpi-delta up">▲ ${uplift_rel_ref}% relativo</span>
+      <div class="kpi-sub">${cvr_t_ref}% trat. vs ${cvr_c_ref}% ctrl</div>
+    </div>
+    <div class="kpi-card info">
+      <div class="kpi-label">Revenue Incremental · ventana ${revenueWindow}d</div>
+      <div class="kpi-value">$${fmt(rev_total)}</div>
+      <span class="kpi-delta up">▲ ${periodNote}</span>
+      <div class="kpi-sub">USD · ${revenueWindow}d post-trigger vs control</div>
+    </div>
+    <div class="kpi-card positive">
+      <div class="kpi-label">Ratio Revenue 60d / 30d · ${isRet ? 'Ene 2026' : 'Feb 2026'}</div>
+      <div class="kpi-value">${ratioRef}</div>
+      <span class="kpi-delta up">▲ 60d recomendado</span>
+      <div class="kpi-sub">${ratioNote}</div>
+    </div>
+    <div class="kpi-card neutral">
+      <div class="kpi-label">Usuarios en experimento</div>
+      <div class="kpi-value">${fmt(n_t+n_c)}</div>
+      <span class="kpi-delta" style="background:var(--neutral-quiet);color:var(--neutral-loud)">
+        ${fmt(n_t)} trat · ${fmt(n_c)} ctrl
+      </span>
+      <div class="kpi-sub">${usersNote}</div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────
+// CHARTS
+// ─────────────────────────────────────────
+const chartDefaults = {
+  font: { family: "'Inter', sans-serif", size: 11 },
+  color: '#646587',
+};
+Chart.defaults.font = chartDefaults.font;
+Chart.defaults.color = chartDefaults.color;
+
+function renderCharts() {
+  const isRet = currentTrack === 'retention';
+  const d = isRet ? DATA[currentTab] : DATA_ADQ['mensual'];
+  const gridColor = 'rgba(208,212,230,.5)';
+
+  // CVR line chart
+  charts.cvr = new Chart(document.getElementById('cvrChart'), {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [
+        {
+          label: 'Tratamiento',
+          data: d.cvr_treatment,
+          borderColor: '#434ce4',
+          backgroundColor: 'rgba(67,76,228,.08)',
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointBackgroundColor: '#434ce4',
+          fill: true,
+          tension: .35,
+        },
+        {
+          label: 'Control',
+          data: d.cvr_control,
+          borderColor: '#b5b9d4',
+          backgroundColor: 'rgba(181,185,212,.06)',
+          borderWidth: 2,
+          borderDash: [5,4],
+          pointRadius: 3,
+          pointBackgroundColor: '#b5b9d4',
+          fill: true,
+          tension: .35,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false,
+        callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 0 } },
+        y: { grid: { color: gridColor }, ticks: { callback: v => v+'%' }, beginAtZero: true }
+      }
+    }
+  });
+
+  // Revenue bar chart
+  charts.revenue = new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+      labels: d.labels,
+      datasets: [{
+        label: 'Revenue Incremental',
+        data: d[`rev_incr_${revenueWindow}d`] || d.rev_incr_30d,
+        backgroundColor: 'rgba(67,76,228,.75)',
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => {
+          const v = ctx.raw;
+          const abs = Math.abs(v), sign = v < 0 ? '-' : '';
+          const fmt = abs >= 1e6 ? sign+'$'+(abs/1e6).toFixed(2)+'M' : abs >= 1e3 ? sign+'$'+(abs/1e3).toFixed(1)+'K' : sign+'$'+abs;
+          return ` ${fmt} USD`;
+        }}
+      }},
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 0 } },
+        y: { grid: { color: gridColor }, ticks: { callback: v => {
+          const abs = Math.abs(v), sign = v < 0 ? '-' : '';
+          return abs >= 1e6 ? sign+'$'+(abs/1e6).toFixed(1)+'M' : abs >= 1e3 ? sign+'$'+(abs/1e3).toFixed(0)+'K' : sign+'$'+abs;
+        }}, beginAtZero: true }
+      }
+    }
+  });
+
+  // Uplift by journey cause (retention) or sub_scope (acquisition)
+  let upliftLabels, upliftVals, upliftColors;
+  if (isRet) {
+    upliftLabels = Object.keys(JOURNEY_DATA);
+    upliftVals = upliftLabels.map(k => ((JOURNEY_DATA[k].cvr_t - JOURNEY_DATA[k].cvr_c) / JOURNEY_DATA[k].cvr_c * 100).toFixed(1));
+    upliftColors = ['#434ce4','#1f8923','#d74009','#646587'];
+  } else {
+    upliftLabels = Object.keys(SUBSCOPE_DATA);
+    upliftVals = upliftLabels.map(k => SUBSCOPE_DATA[k].cvr_uplift_rel);
+    upliftColors = upliftVals.map(v => v < 0 ? '#d74009' : v >= 200 ? '#1f8923' : '#434ce4');
+  }
+
+  charts.uplift = new Chart(document.getElementById('upliftChart'), {
+    type: 'bar',
+    data: {
+      labels: upliftLabels,
+      datasets: [{
+        label: 'CVR Uplift Relativo %',
+        data: upliftVals,
+        backgroundColor: upliftColors,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: isRet ? 'x' : 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw > 0 ? '+' : ''}${ctx.raw}% CVR uplift` } }
+      },
+      scales: {
+        // Retención: barras verticales → % en eje Y · Adquisición: barras horizontales → % en eje X
+        x: { grid: { color: isRet ? 'transparent' : gridColor }, ticks: { callback: isRet ? undefined : v => v + '%' } },
+        y: { grid: { color: gridColor }, ticks: { callback: isRet ? (v => v + '%') : undefined } }
+      }
+    }
+  });
+
+  // Embudo de atribución (solo adquisición)
+  if (!isRet) {
+    const d = DATA_ADQ['mensual'];
+    const pctLastClick = d.n_last_click.map((lc, i) => Math.round(SAFE_DIV(lc, d.n_converted[i]) * 100 * 10) / 10);
+    const pctConverted = d.n_converted.map((cv, i) => Math.round(SAFE_DIV(cv, d.n_treatment[i]) * 100 * 10) / 10);
+
+    charts.funnel = new Chart(document.getElementById('attrFunnelChart'), {
+      type: 'bar',
+      data: {
+        labels: d.labels,
+        datasets: [
+          {
+            label: 'Convirtieron en 3d (FRAME)',
+            data: d.n_converted,
+            backgroundColor: 'rgba(67,76,228,.75)',
+            borderRadius: 4,
+          },
+          {
+            label: 'Last-click atribuido (GOLD)',
+            data: d.n_last_click,
+            backgroundColor: 'rgba(31,137,35,.85)',
+            borderRadius: 4,
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
+          tooltip: {
+            mode: 'index', intersect: false,
+            callbacks: {
+              label: ctx => {
+                const i = ctx.dataIndex;
+                const v = ctx.raw;
+                const fmt = n => n >= 1e3 ? (n/1e3).toFixed(1)+'K' : n;
+                if (ctx.datasetIndex === 0) return ` Convirtieron FRAME: ${fmt(v)}`;
+                if (ctx.datasetIndex === 1) return ` Last-click GOLD: ${fmt(v)} (${pctLastClick[i]}% de convertidos)`;
+              },
+              afterBody: (items) => {
+                const i = items[0].dataIndex;
+                return [`── Atribución directa: ${pctLastClick[i]}%`];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: gridColor }, ticks: { callback: v => v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v } }
+        }
+      }
+    });
+  }
+}
+
+function SAFE_DIV(a, b) { return b === 0 ? 0 : a / b; }
+
+// ─────────────────────────────────────────
+// ACTUALIZAR DATOS — BigQuery REST API
+// ─────────────────────────────────────────
+const BQ_PROJECT = 'meli-sbox';
+const BQ_LOCATION = 'US';
+
+function openUpdateModal() {
+  document.getElementById('updateModal').style.display = 'flex';
+  document.getElementById('updateStatus').textContent = '';
+  document.getElementById('tokenInput').value = '';
+}
+function closeUpdateModal() {
+  document.getElementById('updateModal').style.display = 'none';
+}
+
+async function bqRunJob(token, query) {
+  const setStatus = msg => document.getElementById('updateStatus').textContent = msg;
+
+  // 1. Submit async job
+  setStatus('⏳ Enviando query a BigQuery...');
+  const jobRes = await fetch(
+    `https://bigquery.googleapis.com/bigquery/v2/projects/${BQ_PROJECT}/jobs`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        configuration: { query: { query, useLegacySql: false, location: BQ_LOCATION } }
+      })
+    }
+  );
+  const job = await jobRes.json();
+  if (job.error) throw new Error(job.error.message);
+  const jobId = job.jobReference.jobId;
+
+  // 2. Poll hasta que termine
+  let dots = 0;
+  for (let i = 0; i < 120; i++) {
+    await new Promise(r => setTimeout(r, 2500));
+    dots = (dots + 1) % 4;
+    setStatus(`⏳ Procesando${'.'.repeat(dots + 1)}`);
+    const st = await fetch(
+      `https://bigquery.googleapis.com/bigquery/v2/projects/${BQ_PROJECT}/jobs/${jobId}`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    ).then(r => r.json());
+    if (st.status?.state === 'DONE') {
+      if (st.status.errorResult) throw new Error(st.status.errorResult.message);
+      break;
+    }
+  }
+
+  // 3. Obtener resultados
+  setStatus('⏳ Descargando resultados...');
+  const res = await fetch(
+    `https://bigquery.googleapis.com/bigquery/v2/projects/${BQ_PROJECT}/jobs/${jobId}/queryResults?maxResults=500&location=${BQ_LOCATION}`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  ).then(r => r.json());
+
+  const cols = res.schema?.fields?.map(f => f.name) || [];
+  return (res.rows || []).map(row => {
+    const obj = {};
+    row.f.forEach((cell, i) => obj[cols[i]] = isNaN(cell.v) || cell.v === null ? cell.v : Number(cell.v));
+    return obj;
+  });
+}
+
+const Q_CVR_MENSUAL = `
+WITH
+treatment AS (
+  SELECT CAST(N_cust_adv_id AS INT64) AS user_id, S_site_id AS SITE_ID,
+    MIN(T_sent_date) AS sent_date
+  FROM \`meli-sbox.MADSCOREBI.TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY\`
+  WHERE S_ambito = 'Acquisition' AND S_product = 'PADS' AND S_bu = 'MERCADO ADS'
+    AND T_sent_date >= '2025-12-01' AND T_sent_date < CURRENT_DATE()
+  GROUP BY 1,2
+),
+control AS (
+  SELECT user_id, SITE_ID, SNAPSHOT_DATE AS trigger_date
+  FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE_CONTROL\`
+  WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
+    AND SUB_SCOPE IN ('free trial','sin bonis','bonus')
+    AND SNAPSHOT_DATE >= '2025-12-01' AND SNAPSHOT_DATE < CURRENT_DATE()
+    AND EXTRACT(DAYOFWEEK FROM SNAPSHOT_DATE) IN (2, 3, 5)
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
+),
+frame_min AS (
+  SELECT SELLER_ID, SIT_SITE_ID, MIN(FECHA) AS first_rev_date
+  FROM \`meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS\`
+  WHERE FECHA >= '2025-12-01' AND FECHA <= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+    AND REVS_TOTAL_USD > 0
+  GROUP BY 1,2
+),
+trat_agg AS (
+  SELECT DATE_TRUNC(t.sent_date, MONTH) AS cohort_month, COUNT(*) AS n_trat,
+    COUNTIF(fm.first_rev_date BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 3 DAY)) AS n_converted
+  FROM treatment t
+  LEFT JOIN frame_min fm ON t.user_id = fm.SELLER_ID AND t.SITE_ID = fm.SIT_SITE_ID
+  WHERE t.sent_date <= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1
+),
+ctrl_agg AS (
+  SELECT DATE_TRUNC(c.trigger_date, MONTH) AS cohort_month, COUNT(*) AS n_ctrl,
+    COUNTIF(fm.first_rev_date BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 3 DAY)) AS n_converted
+  FROM control c
+  LEFT JOIN frame_min fm ON c.user_id = fm.SELLER_ID AND c.SITE_ID = fm.SIT_SITE_ID
+  WHERE c.trigger_date <= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1
+)
+SELECT FORMAT_DATE('%Y-%m', t.cohort_month) AS mes,
+  t.n_trat, c.n_ctrl, t.n_converted AS n_conv_trat, c.n_converted AS n_conv_ctrl,
+  ROUND(SAFE_DIVIDE(t.n_converted, t.n_trat)*100, 2) AS cvr_trat,
+  ROUND(SAFE_DIVIDE(c.n_converted, c.n_ctrl)*100, 2) AS cvr_ctrl,
+  ROUND(SAFE_DIVIDE(t.n_converted, t.n_trat)*100 - SAFE_DIVIDE(c.n_converted, c.n_ctrl)*100, 2) AS cvr_uplift_pp,
+  ROUND(SAFE_DIVIDE(SAFE_DIVIDE(t.n_converted,t.n_trat) - SAFE_DIVIDE(c.n_converted,c.n_ctrl), SAFE_DIVIDE(c.n_converted,c.n_ctrl))*100, 1) AS cvr_uplift_rel
+FROM trat_agg t JOIN ctrl_agg c ON t.cohort_month = c.cohort_month
+ORDER BY 1`;
+
+const Q_CVR_SUBSCOPE = `
+WITH
+treatment AS (
+  SELECT CAST(N_cust_adv_id AS INT64) AS user_id, S_site_id AS SITE_ID,
+    MIN(T_sent_date) AS sent_date
+  FROM \`meli-sbox.MADSCOREBI.TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY\`
+  WHERE S_ambito = 'Acquisition' AND S_product = 'PADS' AND S_bu = 'MERCADO ADS'
+    AND T_sent_date >= '2026-01-01' AND T_sent_date < CURRENT_DATE()
+  GROUP BY 1,2
+),
+sub_scope AS (
+  SELECT user_id, SITE_ID, SUB_SCOPE AS sub_scope
+  FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE\`
+  WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
+    AND SUB_SCOPE IN ('free trial','sin bonis','bonus')
+    AND SNAPSHOT_DATE >= '2026-01-01' AND SNAPSHOT_DATE < CURRENT_DATE()
+    AND COALESCE(IS_CONTROL_GROUP, false) = false
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
+),
+control AS (
+  SELECT user_id, SITE_ID, SUB_SCOPE AS sub_scope, SNAPSHOT_DATE AS trigger_date
+  FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE_CONTROL\`
+  WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
+    AND SUB_SCOPE IN ('free trial','sin bonis','bonus')
+    AND SNAPSHOT_DATE >= '2026-01-01' AND SNAPSHOT_DATE < CURRENT_DATE()
+    AND EXTRACT(DAYOFWEEK FROM SNAPSHOT_DATE) IN (2, 3, 5)
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
+),
+frame_min AS (
+  SELECT SELLER_ID, SIT_SITE_ID, MIN(FECHA) AS first_rev_date
+  FROM \`meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS\`
+  WHERE FECHA >= '2026-01-01' AND FECHA <= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+    AND REVS_TOTAL_USD > 0
+  GROUP BY 1,2
+),
+trat_agg AS (
+  SELECT DATE_TRUNC(t.sent_date, MONTH) AS cohort_month,
+    COALESCE(ss.sub_scope, 'sin sub_scope') AS sub_scope,
+    COUNT(*) AS n_trat,
+    COUNTIF(fm.first_rev_date BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 3 DAY)) AS n_converted
+  FROM treatment t
+  LEFT JOIN sub_scope ss ON t.user_id = ss.user_id AND t.SITE_ID = ss.SITE_ID
+  LEFT JOIN frame_min fm ON t.user_id = fm.SELLER_ID AND t.SITE_ID = fm.SIT_SITE_ID
+  WHERE t.sent_date <= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1,2
+),
+ctrl_agg AS (
+  SELECT DATE_TRUNC(c.trigger_date, MONTH) AS cohort_month, c.sub_scope,
+    COUNT(*) AS n_ctrl,
+    COUNTIF(fm.first_rev_date BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 3 DAY)) AS n_converted
+  FROM control c
+  LEFT JOIN frame_min fm ON c.user_id = fm.SELLER_ID AND c.SITE_ID = fm.SIT_SITE_ID
+  WHERE c.trigger_date <= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1,2
+)
+SELECT FORMAT_DATE('%b %Y', t.cohort_month) AS mes, t.sub_scope,
+  t.n_trat, c.n_ctrl, t.n_converted AS n_conv_trat, c.n_converted AS n_conv_ctrl,
+  ROUND(SAFE_DIVIDE(t.n_converted, t.n_trat)*100, 2) AS cvr_trat,
+  ROUND(SAFE_DIVIDE(c.n_converted, c.n_ctrl)*100, 2) AS cvr_ctrl,
+  ROUND(SAFE_DIVIDE(t.n_converted, t.n_trat)*100 - SAFE_DIVIDE(c.n_converted, c.n_ctrl)*100, 2) AS uplift_pp,
+  ROUND(SAFE_DIVIDE(SAFE_DIVIDE(t.n_converted,t.n_trat) - SAFE_DIVIDE(c.n_converted,c.n_ctrl), SAFE_DIVIDE(c.n_converted,c.n_ctrl))*100, 1) AS uplift_rel
+FROM trat_agg t JOIN ctrl_agg c ON t.cohort_month = c.cohort_month AND t.sub_scope = c.sub_scope
+ORDER BY t.cohort_month, t.sub_scope`;
+
+async function runUpdate() {
+  const token = document.getElementById('tokenInput').value.trim();
+  const setStatus = msg => document.getElementById('updateStatus').innerHTML = msg;
+  const btn = document.getElementById('btnRunUpdate');
+
+  if (!token) { setStatus('⚠️ Pegá el access token primero.'); return; }
+
+  btn.disabled = true;
+  btn.style.opacity = '.6';
+
+  try {
+    // Query 1: CVR mensual
+    setStatus('⏳ Query 1/2 — CVR mensual...');
+    const rows1 = await bqRunJob(token, Q_CVR_MENSUAL);
+
+    // Actualizar DATA_ADQ.mensual
+    DATA_ADQ.mensual.labels       = rows1.map(r => {
+      const [y, m] = r.mes.split('-');
+      const d = new Date(+y, +m - 1);
+      const label = d.toLocaleDateString('es-AR', {month:'short', year:'numeric'})
+        .replace(' de ',' ').replace(/\b(\w)/g, c => c.toUpperCase());
+      // Flags
+      if (r.mes === '2025-12') return label + ' *';
+      if (r.cvr_uplift_rel < 10 && r.n_trat < 20000) return label + ' ⚠️';
+      return label;
+    });
+    DATA_ADQ.mensual.cvr_treatment = rows1.map(r => r.cvr_trat);
+    DATA_ADQ.mensual.cvr_control   = rows1.map(r => r.cvr_ctrl);
+    DATA_ADQ.mensual.n_treatment   = rows1.map(r => r.n_trat);
+    DATA_ADQ.mensual.n_control     = rows1.map(r => r.n_ctrl);
+    DATA_ADQ.mensual.n_converted   = rows1.map(r => r.n_conv_trat);
+    // Revenue queda igual hasta correr la query completa con revenue
+
+    // Query 2: CVR sub_scope × mes
+    setStatus('⏳ Query 2/2 — CVR por sub_scope...');
+    const rows2 = await bqRunJob(token, Q_CVR_SUBSCOPE);
+
+    // Actualizar SUBSCOPE_MES_DATA
+    SUBSCOPE_MES_DATA.length = 0;
+    rows2.forEach(r => SUBSCOPE_MES_DATA.push({
+      mes: r.mes, sub_scope: r.sub_scope,
+      n_trat: r.n_trat, n_ctrl: r.n_ctrl,
+      n_conv_trat: r.n_conv_trat, n_conv_ctrl: r.n_conv_ctrl,
+      cvr_trat: r.cvr_trat, cvr_ctrl: r.cvr_ctrl,
+      uplift_pp: r.uplift_pp, uplift_rel: r.uplift_rel
+    }));
+
+    setStatus('✅ Datos actualizados correctamente.');
+
+    // Re-render todo
+    Object.values(charts).forEach(c => c.destroy());
+    charts = {};
+    renderKPIs();
+    renderCharts();
+    renderBreakdown();
+    renderSubscopeMes();
+    renderQueries();
+
+    // Actualizar fecha en footer
+    document.getElementById('updateDate').textContent =
+      new Date().toLocaleDateString('es-AR', {day:'2-digit', month:'short', year:'numeric'});
+
+    setTimeout(closeUpdateModal, 1500);
+
+  } catch(e) {
+    setStatus(`❌ Error: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+}
+
+function updateCharts() {
+  const isRet = currentTrack === 'retention';
+  const d = isRet ? DATA[currentTab] : DATA_ADQ['mensual'];
+  const revKey = `rev_incr_${revenueWindow}d`;
+  const revData = d[revKey] || d.rev_incr_60d;
+
+  charts.cvr.data.labels = d.labels;
+  charts.cvr.data.datasets[0].data = d.cvr_treatment;
+  charts.cvr.data.datasets[1].data = d.cvr_control;
+  charts.cvr.options.scales.y.min = isRet ? undefined : 0;
+  charts.cvr.update();
+
+  charts.revenue.data.labels = d.labels;
+  charts.revenue.data.datasets[0].data = revData;
+  charts.revenue.data.datasets[0].backgroundColor = revData.map(v => v < 0 ? 'rgba(158,0,21,.7)' : 'rgba(67,76,228,.75)');
+  charts.revenue.update();
+
+  const sub = document.getElementById('revSubtitle');
+  if (sub) sub.textContent = `Ventana ${revenueWindow}d post-trigger vs grupo control`;
+}
+
+// ─────────────────────────────────────────
+// BREAKDOWN CARDS
+// ─────────────────────────────────────────
+function renderBreakdown() {
+  const fmtRev = n => {
+    const abs = Math.abs(n), sign = n < 0 ? '-' : '';
+    return sign + (abs >= 1e6 ? '$' + (abs/1e6).toFixed(1)+'M' : '$' + (abs/1e3).toFixed(0)+'K');
+  };
+
+  if (currentTrack === 'retention') {
+    const pillColors = ['pill-blue','pill-green','pill-green','pill-gray'];
+    document.getElementById('breakdownGrid').innerHTML = Object.entries(JOURNEY_DATA)
+      .map(([name, d], i) => {
+        const uplift = ((d.cvr_t - d.cvr_c) / d.cvr_c * 100).toFixed(1);
+        return `
+          <div class="breakdown-card">
+            <div class="bc-label">${name}</div>
+            <div class="bc-metric">+${uplift}%</div>
+            <div class="bc-sub">CVR uplift relativo</div>
+            <br>
+            <div class="bc-sub" style="font-size:11px">CVR trat. <strong>${d.cvr_t}%</strong> · ctrl <strong>${d.cvr_c}%</strong></div>
+            <div class="bc-sub" style="font-size:11px">Rev uplift: <strong>+${d.rev_uplift}%</strong> · N trat: <strong>${(d.n/1000).toFixed(1)}K</strong></div>
+            <div class="bc-sub" style="font-size:11px;margin-top:4px">Incr. acum: <strong>${fmtRev(d.revs_incr)} USD</strong></div>
+            <span class="pill ${pillColors[i]}">+${d.rev_uplift}% rev</span>
+          </div>
+        `;
+      }).join('');
+  } else {
+    const icons = { 'Sin Bonis': '🏪', 'Bonus': '🎁', 'Free Trial': '🆓' };
+    const pillClass = rel => rel < 0 ? 'pill-caution' : rel >= 200 ? 'pill-green' : rel >= 50 ? 'pill-blue' : 'pill-gray';
+    document.getElementById('breakdownGrid').innerHTML = Object.entries(SUBSCOPE_DATA)
+      .map(([name, d]) => `
+        <div class="breakdown-card">
+          <div class="bc-label">${icons[name] || ''} ${name}</div>
+          <div class="bc-metric">${d.cvr_t}%</div>
+          <div class="bc-sub">CVR trat (GOLD) · ${d.cvr_c}% ctrl (FRAME)</div>
+          <span class="pill ${pillClass(d.cvr_uplift_rel)}">${d.cvr_uplift_rel > 0 ? '+' : ''}${d.cvr_uplift_rel}% CVR uplift rel.</span>
+          <div class="bc-sub" style="margin-top:8px">${fmtRev(d.revs_incr)} USD incr. 60d</div>
+          <div class="bc-sub">${(d.n/1000).toFixed(0)}K sellers tratamiento</div>
+        </div>
+      `).join('');
+  }
+}
+
+// ─────────────────────────────────────────
+// SUB_SCOPE × MES TABLE
+// ─────────────────────────────────────────
+function renderSubscopeMes() {
+  const subscopeColors = { 'bonus': '#434ce4', 'free trial': '#d74009', 'sin bonis': '#1f8923' };
+  const pillClass = rel => rel < 0 ? 'pill-caution' : rel >= 100 ? 'pill-green' : rel >= 30 ? 'pill-blue' : 'pill-gray';
+  const fmt = n => n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n;
+
+  const tbody = document.getElementById('subscopeMesBody');
+  if (!tbody) return;
+
+  let lastSub = '';
+  tbody.innerHTML = SUBSCOPE_MES_DATA.map((r, i) => {
+    const isNewSub = r.sub_scope !== lastSub;
+    lastSub = r.sub_scope;
+    const color = subscopeColors[r.sub_scope] || '#646587';
+    const rowBg = isNewSub && i > 0 ? 'border-top:2px solid var(--border-primary);' : '';
+    const upliftFmt = (r.uplift_rel > 0 ? '+' : '') + r.uplift_rel + '%';
+    const warning = (r.n_ctrl < 300 || r.n_trat < 200) ? ' ⚠️' : '';
+    return `<tr style="border-bottom:1px solid var(--border-primary);${rowBg}">
+      <td style="padding:10px 16px;font-weight:600;color:${color}">${isNewSub ? r.sub_scope : ''}</td>
+      <td style="padding:10px 16px;color:var(--text-secondary)">${r.mes}</td>
+      <td style="padding:10px 16px;text-align:right">${fmt(r.n_trat)}</td>
+      <td style="padding:10px 16px;text-align:right;color:var(--text-secondary)">${fmt(r.n_ctrl)}${warning}</td>
+      <td style="padding:10px 16px;text-align:right">${fmt(r.n_conv_trat)}</td>
+      <td style="padding:10px 16px;text-align:right;color:var(--text-secondary)">${r.n_conv_ctrl}</td>
+      <td style="padding:10px 16px;text-align:right;font-weight:700">${r.cvr_trat}%</td>
+      <td style="padding:10px 16px;text-align:right;color:var(--text-secondary)">${r.cvr_ctrl}%</td>
+      <td style="padding:10px 16px;text-align:right">${r.uplift_pp > 0 ? '+' : ''}${r.uplift_pp}pp</td>
+      <td style="padding:10px 16px;text-align:right"><span class="pill ${pillClass(r.uplift_rel)}" style="font-size:11px">${upliftFmt}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────
+// QUERIES
+// ─────────────────────────────────────────
+function renderQueries() {
+  const isRet = currentTrack === 'retention';
+  document.getElementById('queriesRetention').style.display = isRet ? '' : 'none';
+  const adqDiv = document.getElementById('queriesAcquisition');
+  adqDiv.style.display = isRet ? 'none' : 'flex';
+  if (!isRet && adqDiv.innerHTML.trim() === '') {
+    adqDiv.innerHTML = `
+      <div class="chart-card" style="padding:20px 24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="chart-title">Query 1 — CVR mensual (SILVER trigger · control Lun/Mar/Jue)</div>
+            <div class="chart-subtitle" style="margin-bottom:0">Tablas: TURING_SILVER_COMM_PERFO · GROWTH_COMM_TARGET_AUDIENCE_CONTROL · FRAME_DAILY_CAMPAIGN_KPIS · TURING_GOLD_COMMS_CONVERSION</div>
+          </div>
+          <button onclick="copyQuery('qa1')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
+        </div>
+        <pre id="qa1" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">-- ═══════════════════════════════════════════════════════════════════
+-- METODOLOGÍA DE ADQUISICIÓN — PAds Comms Attribution
+-- ═══════════════════════════════════════════════════════════════════
+-- FUENTE DE VERDAD: TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY
+--   Partimos de los sellers que EFECTIVAMENTE recibieron la comunicación.
+--   NO usamos snapshot_date del audience como trigger — hay un gap de ~14-19 días
+--   entre que el seller entra al audience y el día en que se le envía la comm.
+--   Las comms de adquisición se envían: Lunes (push), Martes (mail), Jueves (push remarketing).
+--
+-- GRUPO TRATAMIENTO: seller con T_sent_date en SILVER = fecha real de envío
+-- GRUPO CONTROL: sellers en GROWTH_COMM_TARGET_AUDIENCE_CONTROL cuyo SNAPSHOT_DATE
+--   cae en lunes, martes o jueves — equivalente al calendario de envío del tratamiento.
+--
+-- CVR: % de sellers con REVS_TOTAL_USD > 0 en FRAME en los 3 días post-trigger
+--   Misma metodología para ambos grupos (A/B puro, sin sesgo de atribución).
+--
+-- REVENUE INCREMENTAL: (avg_rev_trat - avg_rev_ctrl) × n_last_click
+--   avg_rev calculado sobre TODOS los sellers del grupo (converters + no converters)
+--   Multiplicado por n_last_click (GOLD N_conversion=1) = sellers con atribución directa a comms
+-- ═══════════════════════════════════════════════════════════════════
+WITH
+-- PASO 1: Tratamiento
+-- Tomamos el PRIMER envío por seller/site desde SILVER.
+-- Esto garantiza un solo trigger por seller y usa la fecha real de envío.
+treatment AS (
+  SELECT
+    CAST(N_cust_adv_id AS INT64) AS user_id,
+    S_site_id AS SITE_ID,
+    MIN(T_sent_date) AS sent_date
+  FROM \`meli-sbox.MADSCOREBI.TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY\`
+  WHERE S_ambito = 'Acquisition'
+    AND S_product = 'PADS'
+    AND S_bu = 'MERCADO ADS'
+    AND T_sent_date >= '2025-12-01' AND T_sent_date &lt; CURRENT_DATE()
+  GROUP BY 1,2
+),
+-- PASO 2: Control
+-- Solo los días en que se envían comms (Lun=2, Mar=3, Jue=5).
+-- Así el grupo control tiene el mismo "calendario de exposición" que el tratamiento.
+-- El primer snapshot en esos días = trigger del control.
+control AS (
+  SELECT user_id, SITE_ID, SNAPSHOT_DATE AS trigger_date
+  FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE_CONTROL\`
+  WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
+    AND SUB_SCOPE IN ('free trial','sin bonis','bonus')
+    AND SNAPSHOT_DATE >= '2025-12-01' AND SNAPSHOT_DATE &lt; CURRENT_DATE()
+    AND EXTRACT(DAYOFWEEK FROM SNAPSHOT_DATE) IN (2, 3, 5)
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
+),
+-- PASO 3: N last-click (GOLD)
+-- Sellers del tratamiento donde la comm fue el último touchpoint antes de convertir.
+-- Se usa como multiplicador del revenue incremental (no para calcular CVR).
+gold AS (
+  SELECT DISTINCT CAST(N_cust_adv_id AS INT64) AS seller_id, S_site_id,
+    MIN(T_sent_date) AS first_conv_date
+  FROM \`meli-sbox.MADSCOREBI.TURING_GOLD_COMMS_CONVERSION\`
+  WHERE S_ambito = 'Hunting' AND S_producto = 'PADS' AND N_conversion = 1
+    AND T_sent_date >= '2025-12-01' AND T_sent_date &lt; CURRENT_DATE()
+  GROUP BY 1,2
+),
+-- PASO 4: FRAME — primera fecha con revenue (para CVR) y revenue acumulado (para avg)
+frame_min AS (
+  SELECT SELLER_ID, SIT_SITE_ID, MIN(FECHA) AS first_rev_date
+  FROM \`meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS\`
+  WHERE FECHA >= '2025-12-01' AND FECHA &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+    AND REVS_TOTAL_USD > 0
+  GROUP BY 1,2
+),
+frame_daily AS (
+  SELECT SELLER_ID, SIT_SITE_ID, FECHA, SUM(REVS_TOTAL_USD) AS revs_usd
+  FROM \`meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS\`
+  WHERE FECHA >= '2025-12-01' AND FECHA &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+  GROUP BY 1,2,3
+),
+-- PASO 5: Métricas por seller de tratamiento
+-- cvr = 1 si tuvo revenue en FRAME en los 3d post-trigger
+-- cvr_gold = 1 si además la comm fue el last-click (GOLD)
+-- revs_30d/60d = revenue acumulado desde trigger (todos los sellers, no solo converters)
+trat_metrics AS (
+  SELECT
+    t.user_id, DATE_TRUNC(t.sent_date, MONTH) AS cohort_month,
+    MAX(CASE WHEN fm.first_rev_date BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 3 DAY) THEN 1 ELSE 0 END) AS cvr,
+    MAX(CASE WHEN g.seller_id IS NOT NULL AND g.first_conv_date >= t.sent_date THEN 1 ELSE 0 END) AS cvr_gold,
+    SUM(CASE WHEN f.FECHA BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 30 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_30d,
+    SUM(CASE WHEN f.FECHA BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 60 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_60d
+  FROM treatment t
+  LEFT JOIN frame_min fm ON t.user_id = fm.SELLER_ID AND t.SITE_ID = fm.SIT_SITE_ID
+  LEFT JOIN gold g ON t.user_id = g.seller_id AND t.SITE_ID = g.S_site_id
+  LEFT JOIN frame_daily f ON t.user_id = f.SELLER_ID AND t.SITE_ID = f.SIT_SITE_ID
+    AND f.FECHA BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 60 DAY)
+  WHERE t.sent_date &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1,2
+),
+-- PASO 6: Métricas por seller de control (misma lógica, sin GOLD)
+ctrl_metrics AS (
+  SELECT
+    c.user_id, DATE_TRUNC(c.trigger_date, MONTH) AS cohort_month,
+    MAX(CASE WHEN fm.first_rev_date BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 3 DAY) THEN 1 ELSE 0 END) AS cvr,
+    SUM(CASE WHEN f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 30 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_30d,
+    SUM(CASE WHEN f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 60 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_60d
+  FROM control c
+  LEFT JOIN frame_min fm ON c.user_id = fm.SELLER_ID AND c.SITE_ID = fm.SIT_SITE_ID
+  LEFT JOIN frame_daily f ON c.user_id = f.SELLER_ID AND c.SITE_ID = f.SIT_SITE_ID
+    AND f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 60 DAY)
+  WHERE c.trigger_date &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1,2
+),
+-- PASO 7: Agregación mensual
+trat_agg AS (
+  SELECT cohort_month, COUNT(*) AS n_trat,
+    COUNTIF(cvr=1) AS n_cvr, COUNTIF(cvr_gold=1) AS n_last_click,
+    AVG(revs_30d) AS avg_30d, AVG(revs_60d) AS avg_60d
+  FROM trat_metrics GROUP BY 1
+),
+ctrl_agg AS (
+  SELECT cohort_month, COUNT(*) AS n_ctrl,
+    COUNTIF(cvr=1) AS n_cvr,
+    AVG(revs_30d) AS avg_30d, AVG(revs_60d) AS avg_60d
+  FROM ctrl_metrics GROUP BY 1
+)
+-- RESULTADO FINAL
+-- cvr_uplift_pp  = diferencia absoluta de CVR (tratamiento - control)
+-- cvr_uplift_rel = uplift relativo = (trat - ctrl) / ctrl
+-- rev_incr_30d/60d = (avg_trat - avg_ctrl) × n_last_click
+--   → revenue incremental atribuible directamente a comms (conservador)
+SELECT
+  FORMAT_DATE('%Y-%m', t.cohort_month) AS mes,
+  t.n_trat, c.n_ctrl, t.n_last_click,
+  ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100, 2) AS cvr_trat,
+  ROUND(SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS cvr_ctrl,
+  ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100 - SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS cvr_uplift_pp,
+  ROUND(SAFE_DIVIDE(SAFE_DIVIDE(t.n_cvr,t.n_trat) - SAFE_DIVIDE(c.n_cvr,c.n_ctrl), SAFE_DIVIDE(c.n_cvr,c.n_ctrl))*100, 1) AS cvr_uplift_rel,
+  ROUND((t.avg_30d - c.avg_30d) * t.n_last_click, 0) AS rev_incr_30d_usd,
+  ROUND((t.avg_60d - c.avg_60d) * t.n_last_click, 0) AS rev_incr_60d_usd,
+  ROUND(SAFE_DIVIDE(t.avg_60d - c.avg_60d, t.avg_30d - c.avg_30d), 2) AS ratio_60_30
+FROM trat_agg t JOIN ctrl_agg c ON t.cohort_month = c.cohort_month
+ORDER BY 1</pre>
+      </div>
+
+      <div class="chart-card" style="padding:20px 24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="chart-title">Query 2 — CVR por Sub_scope × Mes</div>
+            <div class="chart-subtitle" style="margin-bottom:0">Misma metodología · agrega sub_scope (enriquecido desde GROWTH_COMM_TARGET_AUDIENCE)</div>
+          </div>
+          <button onclick="copyQuery('qa2')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
+        </div>
+        <pre id="qa2" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">-- Igual que Query 1 (pasos 1-4 idénticos), luego agrega sub_scope:
+--
+-- El sub_scope NO está en SILVER — viene del GROWTH_COMM_TARGET_AUDIENCE.
+-- Hacemos un LEFT JOIN por user_id/site para enriquecer el tratamiento con su sub_scope.
+-- El control ya tiene sub_scope directamente en la tabla.
+--
+-- ATENCIÓN: algunos sellers de SILVER pueden no tener sub_scope en GROWTH
+-- (si entraron al audience antes de la ventana de análisis). Aparecen como 'sin sub_scope'.
+
+-- ... (pasos 1-4 igual que Query 1) ...
+
+-- PASO 5b: Sub_scope desde audience (enriquecimiento del tratamiento)
+sub_scope_trat AS (
+  SELECT user_id, SITE_ID, SUB_SCOPE AS sub_scope
+  FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE\`
+  WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
+    AND SUB_SCOPE IN ('free trial','sin bonis','bonus')
+    AND SNAPSHOT_DATE >= '2025-12-01' AND SNAPSHOT_DATE &lt; '2026-04-01'
+    AND COALESCE(IS_CONTROL_GROUP, false) = false
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
+),
+
+-- PASO 7b: Agregación por mes + sub_scope
+trat_agg AS (
+  SELECT
+    DATE_TRUNC(t.sent_date, MONTH) AS cohort_month,
+    COALESCE(ss.sub_scope, 'sin sub_scope') AS sub_scope,
+    COUNT(*) AS n_trat,
+    COUNTIF(cvr=1) AS n_cvr
+  FROM trat_metrics t
+  LEFT JOIN sub_scope_trat ss ON t.user_id = ss.user_id AND t.SITE_ID = ss.SITE_ID
+  GROUP BY 1,2
+),
+ctrl_agg AS (
+  SELECT
+    DATE_TRUNC(c.trigger_date, MONTH) AS cohort_month,
+    c.sub_scope,
+    COUNT(*) AS n_ctrl,
+    COUNTIF(cvr=1) AS n_cvr
+  FROM control c  -- el control ya tiene sub_scope
+  LEFT JOIN frame_min fm ON c.user_id = fm.SELLER_ID AND c.SITE_ID = fm.SIT_SITE_ID
+  WHERE c.trigger_date &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1,2
+)
+SELECT
+  FORMAT_DATE('%Y-%m', t.cohort_month) AS mes,
+  t.sub_scope,
+  t.n_trat, c.n_ctrl,
+  t.n_cvr AS n_conv_trat, c.n_cvr AS n_conv_ctrl,
+  ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100, 2) AS cvr_trat,
+  ROUND(SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS cvr_ctrl,
+  ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100 - SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS cvr_uplift_pp,
+  ROUND(SAFE_DIVIDE(
+    SAFE_DIVIDE(t.n_cvr, t.n_trat) - SAFE_DIVIDE(c.n_cvr, c.n_ctrl),
+    SAFE_DIVIDE(c.n_cvr, c.n_ctrl)
+  )*100, 1) AS cvr_uplift_rel
+FROM trat_agg t JOIN ctrl_agg c ON t.cohort_month = c.cohort_month AND t.sub_scope = c.sub_scope
+ORDER BY t.cohort_month, t.sub_scope</pre>
+      </div>
+    `;
+      /* BLOQUE VIEJO — reemplazado por las queries de arriba */
+      /* <div class="chart-card" style="padding:20px 24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="chart-title">Query 1 — CVR (GOLD last-click / FRAME) + Revenue (30d / 60d) — Mensual</div>
+            <div class="chart-subtitle" style="margin-bottom:0">Tablas: GROWTH_COMM_TARGET_AUDIENCE · GROWTH_COMM_TARGET_AUDIENCE_CONTROL · TURING_GOLD_COMMS_CONVERSION · FRAME_DAILY_CAMPAIGN_KPIS</div>
+          </div>
+          <button onclick="copyQuery('qa1')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
+        </div>
+        <pre id="qa1" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">-- CVR tratamiento: last click atribuido a comms (GOLD N_conversion=1, Hunting)
+-- CVR control: % con revenue en FRAME en 3d post-trigger
+-- Revenue ambos grupos: FRAME REVS_TOTAL_USD
+WITH
+treatment AS (
+  SELECT user_id, SITE_ID, SUB_SCOPE AS sub_scope, SNAPSHOT_DATE AS trigger_date
+  FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE\`
+  WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
+    AND SUB_SCOPE IN ('free trial','sin bonis','bonus')
+    AND SNAPSHOT_DATE >= '2025-12-01'
+    AND COALESCE(IS_CONTROL_GROUP, false) = false
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
+),
+control AS (
+  SELECT user_id, SITE_ID, SNAPSHOT_DATE AS trigger_date
+  FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE_CONTROL\`
+  WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
+    AND SNAPSHOT_DATE >= '2025-12-01'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
+),
+gold AS (
+  SELECT DISTINCT CAST(N_cust_adv_id AS INT64) AS seller_id, S_site_id
+  FROM \`meli-sbox.MADSCOREBI.TURING_GOLD_COMMS_CONVERSION\`
+  WHERE S_ambito = 'Hunting' AND S_producto = 'PADS' AND N_conversion = 1
+    AND T_sent_date >= '2025-12-01'
+),
+frame_daily AS (
+  SELECT SELLER_ID, SIT_SITE_ID, FECHA, SUM(REVS_TOTAL_USD) AS revs_usd
+  FROM \`meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS\`
+  WHERE FECHA >= '2025-12-01' AND FECHA &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+  GROUP BY 1,2,3
+),
+trat_metrics AS (
+  SELECT t.user_id, t.sub_scope, DATE_TRUNC(t.trigger_date, MONTH) AS cohort_month,
+    MAX(CASE WHEN g.seller_id IS NOT NULL THEN 1 ELSE 0 END) AS cvr_gold,
+    SUM(CASE WHEN f.FECHA BETWEEN t.trigger_date AND DATE_ADD(t.trigger_date, INTERVAL 30 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_30d,
+    SUM(CASE WHEN f.FECHA BETWEEN t.trigger_date AND DATE_ADD(t.trigger_date, INTERVAL 60 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_60d
+  FROM treatment t
+  LEFT JOIN gold g ON t.user_id = g.seller_id AND t.SITE_ID = g.S_site_id
+  LEFT JOIN frame_daily f ON t.user_id = f.SELLER_ID AND t.SITE_ID = f.SIT_SITE_ID
+    AND f.FECHA BETWEEN t.trigger_date AND DATE_ADD(t.trigger_date, INTERVAL 60 DAY)
+  WHERE t.trigger_date &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1,2,3
+),
+ctrl_metrics AS (
+  SELECT c.user_id, DATE_TRUNC(c.trigger_date, MONTH) AS cohort_month,
+    MAX(CASE WHEN f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 3 DAY) AND f.revs_usd > 0 THEN 1 ELSE 0 END) AS cvr_frame,
+    SUM(CASE WHEN f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 30 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_30d,
+    SUM(CASE WHEN f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 60 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_60d
+  FROM control c
+  LEFT JOIN frame_daily f ON c.user_id = f.SELLER_ID AND c.SITE_ID = f.SIT_SITE_ID
+    AND f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 60 DAY)
+  WHERE c.trigger_date &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  GROUP BY 1,2
+),
+trat_agg AS (SELECT cohort_month, COUNT(*) AS n_trat, ROUND(SAFE_DIVIDE(COUNTIF(cvr_gold=1),COUNT(*))*100,2) AS cvr, AVG(revs_30d) AS avg_30d, AVG(revs_60d) AS avg_60d FROM trat_metrics GROUP BY 1),
+ctrl_agg  AS (SELECT cohort_month, COUNT(*) AS n_ctrl, ROUND(SAFE_DIVIDE(COUNTIF(cvr_frame=1),COUNT(*))*100,2) AS cvr, AVG(revs_30d) AS avg_30d, AVG(revs_60d) AS avg_60d FROM ctrl_metrics  GROUP BY 1)
+SELECT FORMAT_DATE('%Y-%m', t.cohort_month) AS mes, t.n_trat, c.n_ctrl,
+  t.cvr AS cvr_trat, c.cvr AS cvr_ctrl,
+  ROUND(t.cvr - c.cvr, 2) AS uplift_pp,
+  ROUND(SAFE_DIVIDE(t.cvr - c.cvr, c.cvr)*100, 1) AS uplift_rel,
+  ROUND((t.avg_30d - c.avg_30d)*t.n_trat, 0) AS rev_incr_30d,
+  ROUND((t.avg_60d - c.avg_60d)*t.n_trat, 0) AS rev_incr_60d,
+  ROUND(SAFE_DIVIDE(t.avg_60d-c.avg_60d, t.avg_30d-c.avg_30d), 2) AS ratio_60_30
+FROM trat_agg t JOIN ctrl_agg c ON t.cohort_month = c.cohort_month
+ORDER BY 1</pre>
+      </div>
+
+      <div class="chart-card" style="padding:20px 24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="chart-title">Query 2 — Desglose por Sub_scope (acumulado)</div>
+            <div class="chart-subtitle" style="margin-bottom:0">Igual que Query 1 — reemplazá cohort_month por sub_scope en los CTEs de agregación</div>
+          </div>
+          <button onclick="copyQuery('qa2')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
+        </div>
+        <pre id="qa2" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">-- Igual que Query 1 hasta trat_metrics/ctrl_metrics (sin DATE_TRUNC), luego:
+trat_agg AS (SELECT sub_scope, COUNT(*) AS n_trat, ROUND(SAFE_DIVIDE(COUNTIF(cvr_gold=1),COUNT(*))*100,2) AS cvr_trat, AVG(revs_30d) AS avg_30d, AVG(revs_60d) AS avg_60d FROM trat_metrics GROUP BY 1),
+ctrl_agg  AS (SELECT sub_scope, COUNT(*) AS n_ctrl, ROUND(SAFE_DIVIDE(COUNTIF(cvr_frame=1),COUNT(*))*100,2) AS cvr_ctrl, AVG(revs_30d) AS avg_30d, AVG(revs_60d) AS avg_60d FROM ctrl_metrics  GROUP BY 1)
+SELECT t.sub_scope, t.n_trat, c.n_ctrl,
+  t.cvr_trat, c.cvr_ctrl,
+  ROUND(t.cvr_trat - c.cvr_ctrl, 2) AS uplift_pp,
+  ROUND(SAFE_DIVIDE(t.cvr_trat - c.cvr_ctrl, c.cvr_ctrl)*100, 1) AS uplift_rel,
+  ROUND((t.avg_30d - c.avg_30d)*t.n_trat, 0) AS rev_incr_30d,
+  ROUND((t.avg_60d - c.avg_60d)*t.n_trat, 0) AS rev_incr_60d
+FROM trat_agg t JOIN ctrl_agg c ON t.sub_scope = c.sub_scope
+ORDER BY rev_incr_60d DESC</pre>
+      </div>
+      */ /* fin bloque viejo */
+  }
+}
+</script>
+</body>
+</html>
