@@ -1058,6 +1058,66 @@ function renderCharts() {
 function SAFE_DIV(a, b) { return b === 0 ? 0 : a / b; }
 
 // ─────────────────────────────────────────
+// PUBLICAR EN GITHUB PAGES
+// ─────────────────────────────────────────
+const GH_USER  = 'macalopezh';
+const GH_REPO  = 'pads-comms-dashboard';
+const GH_FILE  = 'index.html';
+const GH_PAGES = `https://${GH_USER}.github.io/${GH_REPO}/`;
+
+async function publishToGitHub(bqToken) {
+  // El token de GH se guarda en sessionStorage para no pedirlo de nuevo
+  let ghToken = sessionStorage.getItem('gh_token');
+  if (!ghToken) {
+    ghToken = prompt('Token de GitHub (se guarda solo en esta sesión):');
+    if (!ghToken) throw new Error('Token de GitHub no proporcionado');
+    sessionStorage.setItem('gh_token', ghToken.trim());
+  }
+  ghToken = ghToken.trim();
+
+  const headers = {
+    'Authorization': `token ${ghToken}`,
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json'
+  };
+  const apiUrl = `https://api.github.com/repos/${GH_USER}/${GH_REPO}/contents/${GH_FILE}`;
+
+  // 1. Obtener SHA del archivo actual (necesario para el update)
+  const getRes = await fetch(apiUrl, { headers });
+  if (!getRes.ok && getRes.status !== 404) {
+    const err = await getRes.json();
+    throw new Error(err.message || `GitHub GET error ${getRes.status}`);
+  }
+  const existing = getRes.ok ? await getRes.json() : null;
+  const sha = existing?.sha;
+
+  // 2. Encodear el HTML actual como base64
+  const htmlContent = document.documentElement.outerHTML;
+  const b64 = btoa(unescape(encodeURIComponent(htmlContent)));
+
+  // 3. Crear o actualizar el archivo
+  const payload = {
+    message: `Update dashboard — ${new Date().toLocaleDateString('es-AR')}`,
+    content: b64,
+    ...(sha ? { sha } : {})
+  };
+
+  const putRes = await fetch(apiUrl, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(payload)
+  });
+
+  if (!putRes.ok) {
+    const err = await putRes.json();
+    if (err.message?.includes('Bad credentials')) {
+      sessionStorage.removeItem('gh_token');
+    }
+    throw new Error(err.message || `GitHub PUT error ${putRes.status}`);
+  }
+}
+
+// ─────────────────────────────────────────
 // ACTUALIZAR DATOS — BigQuery REST API
 // ─────────────────────────────────────────
 const BQ_PROJECT = 'meli-sbox';
@@ -1284,7 +1344,7 @@ async function runUpdate() {
       uplift_pp: r.uplift_pp, uplift_rel: r.uplift_rel
     }));
 
-    setStatus('✅ Datos actualizados correctamente.');
+    setStatus('✅ Datos actualizados. Publicando en GitHub Pages...');
 
     // Re-render todo
     Object.values(charts).forEach(c => c.destroy());
@@ -1299,7 +1359,15 @@ async function runUpdate() {
     document.getElementById('updateDate').textContent =
       new Date().toLocaleDateString('es-AR', {day:'2-digit', month:'short', year:'numeric'});
 
-    setTimeout(closeUpdateModal, 1500);
+    // Publicar en GitHub Pages
+    try {
+      await publishToGitHub(token);
+      setStatus('✅ Datos actualizados y publicados en <a href="https://macalopezh.github.io/pads-comms-dashboard/" target="_blank" style="color:var(--positive-loud);font-weight:700">GitHub Pages ↗</a>');
+    } catch(ghErr) {
+      setStatus(`✅ Datos actualizados · ⚠️ GitHub Pages: ${ghErr.message}`);
+    }
+
+    setTimeout(closeUpdateModal, 3000);
 
   } catch(e) {
     setStatus(`❌ Error: ${e.message}`);
