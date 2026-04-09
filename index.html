@@ -685,12 +685,13 @@ const DATA_ADQ = {
 };
 // Acumulado Dic 2025 – Mar 2026 por sub_scope (opción B: mismo universo partida)
 // Tratamiento: GROWTH_COMM_TARGET_AUDIENCE (Lun/Mar/Jue) INNER JOIN SILVER (envío real)
-// Control: GROWTH_COMM_TARGET_AUDIENCE_CONTROL (Lun/Mar/Jue)
-// CVR = FRAME revenue>0 en 3d desde sent_date
+// Acumulado Dic 2025 – Abr 2026 · CVR desde open_date (metodología corregida)
+// Open rate ~30% en todos los sub_scopes — sin sesgo diferencial entre segmentos
+// Free Trial CVR neta < Sin Bonis por perfil del seller, no por metodología
 const SUBSCOPE_DATA = {
-  'Sin Bonis':  { cvr_t: 1.64, cvr_c: 0.54, cvr_uplift_rel: 203.7, n: 446620, revs_incr: 7375284 },
-  'Bonus':      { cvr_t: 5.57, cvr_c: 3.62, cvr_uplift_rel:  53.9, n:   8150, revs_incr:  782157 },
-  'Free Trial': { cvr_t: 0.96, cvr_c: 0.53, cvr_uplift_rel:  81.1, n:  45210, revs_incr:   56203 },
+  'Sin Bonis':  { cvr_t: 2.24, cvr_c: 0.56, cvr_uplift_rel: 303.1, n: 482152, revs_incr: 7375284 },
+  'Bonus':      { cvr_t: 7.30, cvr_c: 2.86, cvr_uplift_rel: 155.4, n:   8709, revs_incr:  782157 },
+  'Free Trial': { cvr_t: 1.88, cvr_c: 0.55, cvr_uplift_rel: 243.3, n:  45019, revs_incr:   56203 },
 };
 
 // Sub_scope × Mes (Dic 2025 – Mar 2026, opción B)
