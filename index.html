@@ -319,7 +319,7 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
   <!-- Charts -->
   <div class="section-header">
     <span class="section-title">Evolución temporal</span>
-    <span class="section-tag" id="periodLabel">Mensual · Sep 2025 – Ene 2026 · († Sep–Oct sin volumen)</span>
+    <span class="section-tag" id="periodLabel">Mensual · Sep 2025 – Mar 2026 · († Sep–Oct sin volumen · ventana 28d)</span>
   </div>
   <div class="charts-grid">
     <div class="chart-card">
@@ -358,10 +358,10 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
   <!-- Data notes -->
   <div id="dataNotes" style="background:var(--info-quiet);border:1px solid #b3c6f7;border-radius:var(--r-8);padding:10px 16px;font-size:12px;color:var(--info-loud);margin-bottom:8px">
     <strong>Notas sobre los datos:</strong>
-    &nbsp;† Sep–Oct 2025: comms sin volumen significativo (CVR &lt; 1%) — track recién iniciado.
-    &nbsp;Revenue en USD (REVS_TOTAL_USD) — comparable entre todos los sites.
-    &nbsp;Rev 3d negativo en Dic refleja estacionalidad en la primera semana post-trigger; 30d y 60d son positivos.
-    &nbsp;Meses más confiables para análisis: <strong>Nov 2025 – Ene 2026</strong>.
+    &nbsp;† Sep–Oct 2025: track recién iniciado, n_ctrl muy bajo — no confiables.
+    &nbsp;<strong>CVR</strong>: FRAME revenue &gt; 0 en 3d desde apertura de cualquier comm del journey (open_date) · fallback a trigger_date si no abrió.
+    &nbsp;<strong>Ventana de control válida: 28 días</strong> — el grupo de control rota mensualmente (~78% pasa a tratamiento al mes siguiente). Después del día 28 no hay benchmark limpio.
+    &nbsp;Revenue en USD · meses confiables: <strong>Dic 2025 – Mar 2026</strong>.
   </div>
 
   <!-- Journey / Sub_scope breakdown cards -->
@@ -370,6 +370,52 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
     <span class="section-tag">Acumulado</span>
   </div>
   <div class="breakdown-grid" id="breakdownGrid"></div>
+
+  <!-- ════════════════════════════════════════════════
+       SECCIONES EXCLUSIVAS DE RETENCIÓN
+       ════════════════════════════════════════════════ -->
+
+  <!-- 1. CVR por Touchpoint del Journey — solo retención -->
+  <div id="touchpointSection" style="display:none;margin-top:32px">
+    <div class="section-header">
+      <span class="section-title">CVR por Punto de Contacto del Journey</span>
+      <span class="section-tag">Dic 2025 – Mar 2026 · acumulado</span>
+    </div>
+    <div style="background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:14px 18px;font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6">
+      <strong style="color:var(--text-primary)">¿Qué muestra este gráfico?</strong>
+      Para cada comunicación del journey (días 0, 4, 7, 14, 21, 28, 35…), medimos qué % de sellers convirtieron
+      en los 3 días siguientes a abrirla. <br>
+      <strong style="color:#00A650">● Días 0-28</strong>: comparación válida con grupo de control —
+      el grupo de control no recibe comms durante el primer mes, por lo que la diferencia es atribuible al journey.<br>
+      <strong style="color:#E63946">● Días 35-63</strong>: solo CVR de tratamiento, <em>sin benchmark válido</em> —
+      el 78% del grupo de control rota a tratamiento al mes siguiente y empieza a recibir comms,
+      por lo que ya no es un grupo limpio de comparación.
+    </div>
+    <div class="chart-card">
+      <div class="chart-wrap" style="height:300px"><canvas id="touchpointChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 2. Experimento 2da mitad del journey — solo retención -->
+  <div id="segundaMitadSection" style="display:none;margin-top:24px">
+    <div class="section-header">
+      <span class="section-title">¿Vale la pena la 2da mitad del journey? (días 35-63)</span>
+      <span class="section-tag">Experimento observacional · Dic 2025 – Mar 2026</span>
+    </div>
+    <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:var(--r-12);padding:14px 18px;font-size:12px;color:#5D4037;margin-bottom:12px;line-height:1.6">
+      <strong>¿Qué compara este gráfico?</strong><br>
+      <strong>Grupo A — Comms días 0-63:</strong> sellers que recibieron el journey completo (tratamiento todo el tiempo).<br>
+      <strong>Grupo B — Silencio días 31-63:</strong> sellers que recibieron comms días 0-28 y luego entraron al grupo de control
+      en el mes siguiente (dejaron de recibir comms). Aproximadamente el 78% del control rota de esta forma.<br><br>
+      <strong>⚠️ Interpretación cuidadosa:</strong> El Grupo B puede tener mayor propensión orgánica a reactivar
+      (sesgo de selección — son sellers que el sistema "decidió" pasar a control).
+      La diferencia de CVR no es puramente atribuible al silencio de comms.
+      Este análisis es <em>exploratorio</em>, no experimental.
+    </div>
+    <div class="chart-card">
+      <div class="chart-wrap" style="height:280px"><canvas id="segundaMitadChart"></canvas></div>
+    </div>
+  </div>
 
   <!-- Sub_scope × Mes — solo adquisición — cards por sub_scope -->
   <div id="subscopeMesSection" style="display:none;margin-top:24px">
@@ -594,16 +640,19 @@ let revenueWindow = 60;  // 3 | 30 | 60
 
 const DATA = {
   mensual: {
-    // Sep-Oct: comms sin volumen significativo (CVR < 1%). Nov-Ene: track en pleno funcionamiento.
-    labels: ['Sep 2025 †','Oct 2025 †','Nov 2025','Dic 2025','Ene 2026'],
-    cvr_treatment: [0.09,  0.94, 30.23, 13.92, 13.83],   // CVR 3d desde apertura
-    cvr_control:   [0.00,  0.08,  0.05,  6.70,  7.66],
-    open_rate:     [11.5, 18.5,  16.7,  20.4,  21.3],    // % abrieron push
-    rev_incr_3d:   [     16,     252,  1234692,  -16805,   16561],
-    rev_incr_30d:  [     17,   69557,  9777696,  101335,  466874],
-    rev_incr_60d:  [  22061,  363954, 16530588,  231153,  967117],
-    n_treatment:   [16344, 17631, 32290, 26323, 15164],
-    n_control:     [  362,  1240,  1948,  4406,  2362],
+    // CVR: FRAME revenue>0 en 3d desde open_date de cualquier comm del journey (o trigger_date fallback)
+    // Ventana de comparación: 28 días desde entrada (período con grupo de control limpio)
+    // El grupo de control rota mensualmente — después del día 28 no es comparable
+    // † Sep-Oct 2025: track recién iniciado, n_ctrl muy bajo
+    labels: ['Sep 2025 †','Oct 2025 †','Nov 2025','Dic 2025','Ene 2026','Feb 2026','Mar 2026'],
+    cvr_treatment: [0.00,  0.00,  6.48, 41.87, 32.83, 29.45, 33.50],
+    cvr_control:   [0.00,  0.00,  0.09, 18.80, 16.59, 24.11, 35.91],
+    open_rate:     [9.1, 19.8,  33.0,  33.0,  37.7,  39.0,  37.2],
+    rev_incr_3d:   [   16,    252, 1234692,  -16805,   16561,    0,    0],
+    rev_incr_30d:  [   17,  69557, 9777696,  101335,  466874,    0,    0],
+    rev_incr_60d:  [22061, 363954,16530588,  231153,  967117,    0,    0],
+    n_treatment:   [9298, 14736, 21612, 47449, 22756, 19589, 8576],
+    n_control:     [ 362,  1240,  2127,  4856,  3219,  3218, 1281],
   },
   semanal: {
     // Revenue semanal USD · todos los sites · W37/25–W09/26
@@ -626,13 +675,48 @@ const DATA = {
   }
 };
 
-// Acumulado Dic 2025–Ene 2026 (ventana 60d completa) — todos los sites — USD
+// Acumulado Dic 2025–Mar 2026 (ventana 60d completa) — todos los sites — USD
 const JOURNEY_DATA = {
   'Tuvo venta':         { cvr_t: 17.62, cvr_c:  7.88, rev_uplift: 123.6, n: 41702, revs_incr: 4248269 },
   'Otra Reputación':    { cvr_t:  8.08, cvr_c:  2.54, rev_uplift: 217.8, n: 20358, revs_incr:  465021 },
   'Sin Items Activos':  { cvr_t:  3.43, cvr_c:  1.25, rev_uplift: 173.5, n: 11876, revs_incr:  317358 },
   'No tuvo venta':      { cvr_t:  2.10, cvr_c:  0.81, rev_uplift: 159.2, n: 18498, revs_incr:   69287 },
 };
+
+// ─────────────────────────────────────────
+// RETENCIÓN — CVR por Touchpoint del Journey
+// Acumulado Dic 2025 – Mar 2026
+// Días 0-28: comparación válida con grupo de control (ctrl rota mensualmente → limpio ≤28d)
+// Días 35-63: solo CVR tratamiento — sin ctrl válido (el ctrl rotó y recibe comms)
+// ─────────────────────────────────────────
+const TOUCHPOINT_DATA = [
+  { dia:  0, n_delivered: 25232, n_opened:  5606, open_rate: 22.2, cvr_trat: 24.67, cvr_ctrl:  7.16, uplift_pp: 17.50, uplift_rel: 244.3, ctrl_valido: true  },
+  { dia:  4, n_delivered: 28906, n_opened:  2729, open_rate:  9.4, cvr_trat: 15.03, cvr_ctrl:  9.46, uplift_pp:  5.57, uplift_rel:  58.9, ctrl_valido: true  },
+  { dia:  7, n_delivered: 34138, n_opened:  3959, open_rate: 11.6, cvr_trat: 12.02, cvr_ctrl: 10.67, uplift_pp:  1.35, uplift_rel:  12.7, ctrl_valido: true  },
+  { dia: 14, n_delivered: 33076, n_opened:  4802, open_rate: 14.5, cvr_trat:  8.76, cvr_ctrl: 13.32, uplift_pp: -4.56, uplift_rel: -34.2, ctrl_valido: true  },
+  { dia: 21, n_delivered: 30872, n_opened:  2847, open_rate:  9.2, cvr_trat:  7.10, cvr_ctrl: 15.06, uplift_pp: -7.97, uplift_rel: -52.9, ctrl_valido: true  },
+  { dia: 28, n_delivered:  5589, n_opened:   363, open_rate:  6.5, cvr_trat: 18.45, cvr_ctrl: 15.81, uplift_pp:  2.64, uplift_rel:  16.7, ctrl_valido: true  },
+  { dia: 35, n_delivered: 31659, n_opened:  1761, open_rate:  5.6, cvr_trat:  5.12, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
+  { dia: 49, n_delivered: 29937, n_opened:  2493, open_rate:  8.3, cvr_trat:  4.73, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
+  { dia: 56, n_delivered: 29841, n_opened:  1603, open_rate:  5.4, cvr_trat:  4.33, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
+  { dia: 63, n_delivered: 29179, n_opened:  1726, open_rate:  5.9, cvr_trat:  2.58, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
+];
+
+// ─────────────────────────────────────────
+// RETENCIÓN — Experimento 2da mitad del journey
+// Pregunta: ¿agregar comms días 35-63 ayuda, perjudica o es neutral?
+// Grupo A: sellers que recibieron comms en TODA la secuencia (días 0-63)
+// Grupo B: sellers que recibieron comms días 0-28 y luego SILENCIO días 29-63
+//          (eran tratamiento mes 1, pasaron a grupo de control en mes 2 — ~78% rota)
+// NOTA: Grupo B tiene sesgo de selección — son sellers con mayor propensión orgánica
+//       a reactivar. Interpretar con cautela.
+// ─────────────────────────────────────────
+const SEGUNDA_MITAD_DATA = [
+  { dia: 35, n_a: 31178, cvr_a:  5.17, n_b: 2476, cvr_b: 21.73, diff_pp: -16.56 },
+  { dia: 49, n_a: 29725, cvr_a:  4.75, n_b: 2206, cvr_b: 25.07, diff_pp: -20.32 },
+  { dia: 56, n_a: 29679, cvr_a:  4.34, n_b: 2045, cvr_b: 26.26, diff_pp: -21.92 },
+  { dia: 63, n_a: 29058, cvr_a:  2.58, n_b: 1901, cvr_b: 26.99, diff_pp: -24.41 },
+];
 
 // ─────────────────────────────────────────
 // ADQUISICIÓN — Metodología actualizada
@@ -706,6 +790,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderCharts();
   renderBreakdown();
   renderQueries();
+  // Retención es el track por defecto
+  renderTouchpointChart();
+  renderSegundaMitadChart();
 });
 
 // ─────────────────────────────────────────
@@ -772,7 +859,10 @@ function updateDashboard() {
   // Mostrar/ocultar embudo de atribución
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
   document.getElementById('subscopeMesSection').style.display = isRet ? 'none' : '';
+  document.getElementById('touchpointSection').style.display = isRet ? '' : 'none';
+  document.getElementById('segundaMitadSection').style.display = isRet ? '' : 'none';
   if (!isRet) renderSubscopeMes();
+  if (isRet) { renderTouchpointChart(); renderSegundaMitadChart(); }
 
   renderKPIs();
   // Destruye y recrea charts para soportar cambio de indexAxis (retention↔acquisition)
@@ -1488,6 +1578,136 @@ function renderBreakdown() {
 // ─────────────────────────────────────────
 // SUB_SCOPE × MES TABLE
 // ─────────────────────────────────────────
+// ─────────────────────────────────────────
+// RETENCIÓN — Gráfico de touchpoints
+// ─────────────────────────────────────────
+function renderTouchpointChart() {
+  const el = document.getElementById('touchpointChart');
+  if (!el) return;
+  if (charts.touchpoint) { charts.touchpoint.destroy(); delete charts.touchpoint; }
+
+  const gridColor = 'rgba(228,232,240,.5)';
+  const labels = TOUCHPOINT_DATA.map(d => `Día ${d.dia}`);
+  const cvrTrat = TOUCHPOINT_DATA.map(d => d.cvr_trat);
+  const cvrCtrl = TOUCHPOINT_DATA.map(d => d.cvr_ctrl);
+  const hasCtrl = TOUCHPOINT_DATA.map(d => d.ctrl_valido);
+
+  // Colores: verde para ctrl válido, naranja para sin ctrl
+  const barColors = TOUCHPOINT_DATA.map(d => d.ctrl_valido ? 'rgba(67,76,228,.8)' : 'rgba(230,57,70,.7)');
+
+  charts.touchpoint = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'CVR Tratamiento',
+          data: cvrTrat,
+          backgroundColor: barColors,
+          borderRadius: 5,
+          order: 2,
+        },
+        {
+          label: 'CVR Control (válido ≤28d)',
+          data: cvrCtrl,
+          type: 'line',
+          borderColor: '#888888',
+          backgroundColor: 'rgba(136,136,136,.1)',
+          borderWidth: 2,
+          borderDash: [5, 4],
+          pointRadius: TOUCHPOINT_DATA.map(d => d.ctrl_valido ? 5 : 0),
+          pointBackgroundColor: '#888888',
+          fill: false,
+          tension: .3,
+          order: 1,
+          spanGaps: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.datasetIndex === 0) return ` CVR trat: ${ctx.raw}%`;
+              if (ctx.raw === null) return null;
+              return ` CVR ctrl: ${ctx.raw}% ✓ válido`;
+            },
+            afterBody: items => {
+              const i = items[0].dataIndex;
+              const d = TOUCHPOINT_DATA[i];
+              const lines = [`Open rate: ${d.open_rate}% · n=${(d.n_delivered/1000).toFixed(0)}K`];
+              if (!d.ctrl_valido) lines.push('⚠️ Sin control válido — ctrl rotó a tratamiento');
+              return lines;
+            }
+          }
+        },
+        annotation: {}
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────
+// RETENCIÓN — Gráfico 2da mitad del journey
+// ─────────────────────────────────────────
+function renderSegundaMitadChart() {
+  const el = document.getElementById('segundaMitadChart');
+  if (!el) return;
+  if (charts.segundaMitad) { charts.segundaMitad.destroy(); delete charts.segundaMitad; }
+
+  const gridColor = 'rgba(228,232,240,.5)';
+  const labels = SEGUNDA_MITAD_DATA.map(d => `Día ${d.dia}`);
+
+  charts.segundaMitad = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Grupo A — Comms días 0-63 (journey completo)',
+          data: SEGUNDA_MITAD_DATA.map(d => d.cvr_a),
+          backgroundColor: 'rgba(67,76,228,.8)',
+          borderRadius: 5,
+          barPercentage: 0.45,
+        },
+        {
+          label: 'Grupo B — Silencio días 31-63 (comms solo 1ra mitad)',
+          data: SEGUNDA_MITAD_DATA.map(d => d.cvr_b),
+          backgroundColor: 'rgba(0,166,80,.75)',
+          borderRadius: 5,
+          barPercentage: 0.45,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label.split('—')[0].trim()}: ${ctx.raw}%`,
+            afterBody: items => {
+              const d = SEGUNDA_MITAD_DATA[items[0].dataIndex];
+              return [`Diferencia: ${d.diff_pp}pp`, `⚠️ Sesgo de selección — ver nota metodológica`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
 function renderSubscopeMes() {
   const container = document.getElementById('subscopeMesCards');
   if (!container) return;
