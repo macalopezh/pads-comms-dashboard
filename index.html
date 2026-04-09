@@ -1506,7 +1506,7 @@ function renderQueries() {
       <div class="chart-card" style="padding:20px 24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div>
-            <div class="chart-title">Query 1 — CVR mensual (SILVER trigger · control Lun/Mar/Jue)</div>
+            <div class="chart-title">Query 1 — CVR mensual + embudo de atribución (open_date trigger)</div>
             <div class="chart-subtitle" style="margin-bottom:0">Tablas: TURING_SILVER_COMM_PERFO · GROWTH_COMM_TARGET_AUDIENCE_CONTROL · FRAME_DAILY_CAMPAIGN_KPIS · TURING_GOLD_COMMS_CONVERSION</div>
           </div>
           <button onclick="copyQuery('qa1')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
@@ -1514,13 +1514,22 @@ function renderQueries() {
         <pre id="qa1" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">-- ═══════════════════════════════════════════════════════════════════
 -- METODOLOGÍA DE ADQUISICIÓN — PAds Comms Attribution
 -- ═══════════════════════════════════════════════════════════════════
--- FUENTE DE VERDAD: TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY
---   Partimos de los sellers que EFECTIVAMENTE recibieron la comunicación.
---   NO usamos snapshot_date del audience como trigger — hay un gap de ~14-19 días
---   entre que el seller entra al audience y el día en que se le envía la comm.
---   Las comms de adquisición se envían: Lunes (push), Martes (mail), Jueves (push remarketing).
+-- TRIGGER: open_date (primera apertura de la comm por el seller)
+--   Si el seller no abrió, fallback a sent_date.
+--   Razón: GOLD mide N_conversion=1 a los ~2 días desde el open, no desde el sent.
+--   Usar open_date homologa la ventana de medición entre FRAME y GOLD.
 --
--- GRUPO TRATAMIENTO: seller con T_sent_date en SILVER = fecha real de envío
+-- GRUPO TRATAMIENTO: sellers en SILVER (S_ambito='Acquisition', S_product='PADS')
+--   CVR = FRAME revenue>0 en los 3 días desde open_date
+--   Last-click = GOLD N_conversion=1 con T_event_date en los 3 días desde open_date
+--
+-- GRUPO CONTROL: GROWTH_COMM_TARGET_AUDIENCE_CONTROL filtrado a Lun/Mar/Jue
+--   (días equivalentes al calendario de envío de comms de adquisición)
+--   CVR = FRAME revenue>0 en 3 días desde snapshot_date
+--
+-- EMBUDO coherente: n_converted (FRAME) siempre >= n_last_click (GOLD)
+-- REVENUE: (avg_rev_trat - avg_rev_ctrl) × n_last_click — pendiente ventana 30d/60d
+-- ═══════════════════════════════════════════════════════════════════
 -- GRUPO CONTROL: sellers en GROWTH_COMM_TARGET_AUDIENCE_CONTROL cuyo SNAPSHOT_DATE
 --   cae en lunes, martes o jueves — equivalente al calendario de envío del tratamiento.
 --
@@ -1532,25 +1541,24 @@ function renderQueries() {
 --   Multiplicado por n_last_click (GOLD N_conversion=1) = sellers con atribución directa a comms
 -- ═══════════════════════════════════════════════════════════════════
 WITH
--- PASO 1: Tratamiento
--- Tomamos el PRIMER envío por seller/site desde SILVER.
--- Esto garantiza un solo trigger por seller y usa la fecha real de envío.
-treatment AS (
+-- PASO 1: Tratamiento desde SILVER
+-- sent_date = fecha real de envío (trigger inicial)
+-- open_date = primera apertura por el seller (trigger para medir CVR y embudo)
+-- Fallback a sent_date si el seller nunca abrió
+silver AS (
   SELECT
     CAST(N_cust_adv_id AS INT64) AS user_id,
     S_site_id AS SITE_ID,
-    MIN(T_sent_date) AS sent_date
+    MIN(T_sent_date) AS sent_date,
+    MIN(CASE WHEN N_open > 0 THEN T_event_date END) AS open_date
   FROM \`meli-sbox.MADSCOREBI.TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY\`
-  WHERE S_ambito = 'Acquisition'
-    AND S_product = 'PADS'
-    AND S_bu = 'MERCADO ADS'
+  WHERE S_ambito = 'Acquisition' AND S_product = 'PADS'
     AND T_sent_date >= '2025-12-01' AND T_sent_date &lt; CURRENT_DATE()
   GROUP BY 1,2
 ),
 -- PASO 2: Control
--- Solo los días en que se envían comms (Lun=2, Mar=3, Jue=5).
--- Así el grupo control tiene el mismo "calendario de exposición" que el tratamiento.
--- El primer snapshot en esos días = trigger del control.
+-- Audience Lun/Mar/Jue = mismo calendario que los días de envío
+-- trigger_date = snapshot_date (equivalente al sent_date del tratamiento)
 control AS (
   SELECT user_id, SITE_ID, SNAPSHOT_DATE AS trigger_date
   FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE_CONTROL\`
@@ -1560,18 +1568,18 @@ control AS (
     AND EXTRACT(DAYOFWEEK FROM SNAPSHOT_DATE) IN (2, 3, 5)
   QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
 ),
--- PASO 3: N last-click (GOLD)
--- Sellers del tratamiento donde la comm fue el último touchpoint antes de convertir.
--- Se usa como multiplicador del revenue incremental (no para calcular CVR).
+-- PASO 3: GOLD last-click
+-- T_event_date = fecha real de conversión (~2 días desde open)
+-- Solo cuenta si T_event_date cae dentro de los 3d desde open_date del tratamiento
 gold AS (
-  SELECT DISTINCT CAST(N_cust_adv_id AS INT64) AS seller_id, S_site_id,
-    MIN(T_sent_date) AS first_conv_date
+  SELECT CAST(N_cust_adv_id AS INT64) AS seller_id, S_site_id,
+    MIN(T_event_date) AS conv_event_date
   FROM \`meli-sbox.MADSCOREBI.TURING_GOLD_COMMS_CONVERSION\`
   WHERE S_ambito = 'Hunting' AND S_producto = 'PADS' AND N_conversion = 1
     AND T_sent_date >= '2025-12-01' AND T_sent_date &lt; CURRENT_DATE()
   GROUP BY 1,2
 ),
--- PASO 4: FRAME — primera fecha con revenue (para CVR) y revenue acumulado (para avg)
+-- PASO 4: FRAME — primera fecha con revenue
 frame_min AS (
   SELECT SELLER_ID, SIT_SITE_ID, MIN(FECHA) AS first_rev_date
   FROM \`meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS\`
@@ -1579,73 +1587,63 @@ frame_min AS (
     AND REVS_TOTAL_USD > 0
   GROUP BY 1,2
 ),
-frame_daily AS (
-  SELECT SELLER_ID, SIT_SITE_ID, FECHA, SUM(REVS_TOTAL_USD) AS revs_usd
-  FROM \`meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS\`
-  WHERE FECHA >= '2025-12-01' AND FECHA &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
-  GROUP BY 1,2,3
-),
--- PASO 5: Métricas por seller de tratamiento
--- cvr = 1 si tuvo revenue en FRAME en los 3d post-trigger
--- cvr_gold = 1 si además la comm fue el last-click (GOLD)
--- revs_30d/60d = revenue acumulado desde trigger (todos los sellers, no solo converters)
-trat_metrics AS (
+-- PASO 5: Métricas tratamiento
+-- cvr_frame = revenue>0 en 3d desde open_date (o sent_date si no abrió)
+-- cvr_gold  = last-click GOLD con T_event_date en 3d desde open_date → coherente con cvr_frame
+-- Filtro: al menos 3 días pasaron desde el trigger para que la ventana esté completa
+trat_agg AS (
   SELECT
-    t.user_id, DATE_TRUNC(t.sent_date, MONTH) AS cohort_month,
-    MAX(CASE WHEN fm.first_rev_date BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 3 DAY) THEN 1 ELSE 0 END) AS cvr,
-    MAX(CASE WHEN g.seller_id IS NOT NULL AND g.first_conv_date >= t.sent_date THEN 1 ELSE 0 END) AS cvr_gold,
-    SUM(CASE WHEN f.FECHA BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 30 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_30d,
-    SUM(CASE WHEN f.FECHA BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 60 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_60d
-  FROM treatment t
-  LEFT JOIN frame_min fm ON t.user_id = fm.SELLER_ID AND t.SITE_ID = fm.SIT_SITE_ID
-  LEFT JOIN gold g ON t.user_id = g.seller_id AND t.SITE_ID = g.S_site_id
-  LEFT JOIN frame_daily f ON t.user_id = f.SELLER_ID AND t.SITE_ID = f.SIT_SITE_ID
-    AND f.FECHA BETWEEN t.sent_date AND DATE_ADD(t.sent_date, INTERVAL 60 DAY)
-  WHERE t.sent_date &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
-  GROUP BY 1,2
+    DATE_TRUNC(s.sent_date, MONTH) AS cohort_month,
+    COUNT(*) AS n_trat,
+    COUNTIF(s.open_date IS NOT NULL) AS n_opened,
+    COUNTIF(
+      fm.first_rev_date BETWEEN COALESCE(s.open_date, s.sent_date)
+      AND DATE_ADD(COALESCE(s.open_date, s.sent_date), INTERVAL 3 DAY)
+    ) AS n_cvr_frame,
+    COUNTIF(
+      g.seller_id IS NOT NULL
+      AND g.conv_event_date >= COALESCE(s.open_date, s.sent_date)
+      AND g.conv_event_date &lt;= DATE_ADD(COALESCE(s.open_date, s.sent_date), INTERVAL 3 DAY)
+    ) AS n_last_click_gold
+  FROM silver s
+  LEFT JOIN frame_min fm ON s.user_id = fm.SELLER_ID AND s.SITE_ID = fm.SIT_SITE_ID
+  LEFT JOIN gold g ON s.user_id = g.seller_id AND s.SITE_ID = g.S_site_id
+  WHERE DATE_ADD(COALESCE(s.open_date, s.sent_date), INTERVAL 3 DAY)
+        &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+  GROUP BY 1
 ),
--- PASO 6: Métricas por seller de control (misma lógica, sin GOLD)
-ctrl_metrics AS (
+-- PASO 6: Métricas control
+ctrl_agg AS (
   SELECT
-    c.user_id, DATE_TRUNC(c.trigger_date, MONTH) AS cohort_month,
-    MAX(CASE WHEN fm.first_rev_date BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 3 DAY) THEN 1 ELSE 0 END) AS cvr,
-    SUM(CASE WHEN f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 30 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_30d,
-    SUM(CASE WHEN f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 60 DAY) THEN COALESCE(f.revs_usd,0) ELSE 0 END) AS revs_60d
+    DATE_TRUNC(c.trigger_date, MONTH) AS cohort_month,
+    COUNT(*) AS n_ctrl,
+    COUNTIF(
+      fm.first_rev_date BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 3 DAY)
+    ) AS n_cvr_ctrl
   FROM control c
   LEFT JOIN frame_min fm ON c.user_id = fm.SELLER_ID AND c.SITE_ID = fm.SIT_SITE_ID
-  LEFT JOIN frame_daily f ON c.user_id = f.SELLER_ID AND c.SITE_ID = f.SIT_SITE_ID
-    AND f.FECHA BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 60 DAY)
-  WHERE c.trigger_date &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
-  GROUP BY 1,2
-),
--- PASO 7: Agregación mensual
-trat_agg AS (
-  SELECT cohort_month, COUNT(*) AS n_trat,
-    COUNTIF(cvr=1) AS n_cvr, COUNTIF(cvr_gold=1) AS n_last_click,
-    AVG(revs_30d) AS avg_30d, AVG(revs_60d) AS avg_60d
-  FROM trat_metrics GROUP BY 1
-),
-ctrl_agg AS (
-  SELECT cohort_month, COUNT(*) AS n_ctrl,
-    COUNTIF(cvr=1) AS n_cvr,
-    AVG(revs_30d) AS avg_30d, AVG(revs_60d) AS avg_60d
-  FROM ctrl_metrics GROUP BY 1
+  WHERE DATE_ADD(c.trigger_date, INTERVAL 3 DAY) &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+  GROUP BY 1
 )
--- RESULTADO FINAL
--- cvr_uplift_pp  = diferencia absoluta de CVR (tratamiento - control)
--- cvr_uplift_rel = uplift relativo = (trat - ctrl) / ctrl
--- rev_incr_30d/60d = (avg_trat - avg_ctrl) × n_last_click
---   → revenue incremental atribuible directamente a comms (conservador)
+-- RESULTADO
+-- n_cvr_frame:     convertidos (FRAME revenue>0 en 3d desde open)
+-- n_last_click:    last-click atribuido (GOLD T_event_date en 3d desde open) — siempre &lt;= n_cvr_frame
+-- pct_last_click:  % de convertidos con atribución directa a comms
 SELECT
   FORMAT_DATE('%Y-%m', t.cohort_month) AS mes,
-  t.n_trat, c.n_ctrl, t.n_last_click,
-  ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100, 2) AS cvr_trat,
-  ROUND(SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS cvr_ctrl,
-  ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100 - SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS cvr_uplift_pp,
-  ROUND(SAFE_DIVIDE(SAFE_DIVIDE(t.n_cvr,t.n_trat) - SAFE_DIVIDE(c.n_cvr,c.n_ctrl), SAFE_DIVIDE(c.n_cvr,c.n_ctrl))*100, 1) AS cvr_uplift_rel,
-  ROUND((t.avg_30d - c.avg_30d) * t.n_last_click, 0) AS rev_incr_30d_usd,
-  ROUND((t.avg_60d - c.avg_60d) * t.n_last_click, 0) AS rev_incr_60d_usd,
-  ROUND(SAFE_DIVIDE(t.avg_60d - c.avg_60d, t.avg_30d - c.avg_30d), 2) AS ratio_60_30
+  t.n_trat, c.n_ctrl,
+  t.n_opened,
+  ROUND(SAFE_DIVIDE(t.n_opened, t.n_trat)*100, 1) AS open_rate_pct,
+  t.n_cvr_frame AS n_conv_frame,
+  t.n_last_click_gold AS n_last_click,
+  ROUND(SAFE_DIVIDE(t.n_cvr_frame, t.n_trat)*100, 2) AS cvr_trat,
+  ROUND(SAFE_DIVIDE(c.n_cvr_ctrl, c.n_ctrl)*100, 2) AS cvr_ctrl,
+  ROUND(SAFE_DIVIDE(t.n_cvr_frame, t.n_trat)*100 - SAFE_DIVIDE(c.n_cvr_ctrl, c.n_ctrl)*100, 2) AS cvr_uplift_pp,
+  ROUND(SAFE_DIVIDE(
+    SAFE_DIVIDE(t.n_cvr_frame, t.n_trat) - SAFE_DIVIDE(c.n_cvr_ctrl, c.n_ctrl),
+    SAFE_DIVIDE(c.n_cvr_ctrl, c.n_ctrl)
+  )*100, 1) AS cvr_uplift_rel,
+  ROUND(SAFE_DIVIDE(t.n_last_click_gold, t.n_cvr_frame)*100, 1) AS pct_last_click_de_convertidos
 FROM trat_agg t JOIN ctrl_agg c ON t.cohort_month = c.cohort_month
 ORDER BY 1</pre>
       </div>
