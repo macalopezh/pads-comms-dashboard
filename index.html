@@ -670,17 +670,17 @@ const DATA_ADQ = {
   mensual: {
     // CVR trat: FRAME revenue>0 en 3d desde open_date (si abrió) o sent_date (fallback)
     // CVR ctrl: FRAME revenue>0 en 3d desde snapshot_date (Lun/Mar/Jue)
-    // Embudo: n_converted (FRAME 3d desde open) >= n_last_click (GOLD T_event_date en 3d desde open) ✓
-    // Rev incr: pendiente con nueva metodología
-    labels: ['Dic 2025 *', 'Ene 2026', 'Feb 2026', 'Mar 2026 ⚠️'],
-    cvr_treatment: [2.09, 2.89, 2.84, 2.67],
-    cvr_control:   [0.44, 0.59, 0.82, 0.49],
-    rev_incr_30d:  [0,  3263,  1518,  1611],
-    rev_incr_60d:  [0,  3315,  2467,  1966],
-    n_treatment:   [374562, 38746, 74107, 13686],
-    n_control:     [ 22586, 23589, 23526, 24287],
-    n_converted:   [7821, 1118, 2107, 366],   // FRAME revenue>0 en 3d desde open_date
-    n_last_click:  [3702,  669, 1049, 243],   // GOLD N_conversion=1 en 3d desde open_date ✓ siempre <= n_converted
+    // ⚠️ solo aplica a revenue (ventana 30d/60d), NO a CVR ni embudo
+    // Abr 2026: preliminar — solo primera semana, n_trat bajo
+    labels: ['Dic 2025 *', 'Ene 2026', 'Feb 2026', 'Mar 2026', 'Abr 2026 †'],
+    cvr_treatment: [2.07, 2.87, 2.81, 2.58, 4.14],
+    cvr_control:   [0.44, 0.59, 0.82, 0.70, 0.30],
+    rev_incr_30d:  [0,  3263,  1518,  1611,  0],  // Abr y Dic sin ventana 30d completa
+    rev_incr_60d:  [0,  3315,  2467,  1966,  0],
+    n_treatment:   [371422, 38456, 73035, 52432,  2006],
+    n_control:     [ 22586, 23589, 23526, 27122, 22179],
+    n_converted:   [ 7694,  1105,  2054,  1355,    83],
+    n_last_click:  [ 3581,   659,   990,   753,     5],
   }
 };
 // Acumulado Dic 2025 – Mar 2026 por sub_scope (opción B: mismo universo partida)
@@ -737,7 +737,7 @@ function switchTab(tab, btn) {
   const isRet = currentTrack === 'retention';
   document.getElementById('periodLabel').textContent = isRet
     ? (tab === 'mensual' ? 'Mensual · Sep 2025 – Ene 2026 · († Sep–Oct sin volumen)' : 'Semanal · W37/25 – W09/26')
-    : 'Mensual · Dic 2025 – Mar 2026 · (* Dic backlog histórico · ⚠️ Mar ventana incompleta)';
+    : 'Mensual · Dic 2025 – Abr 2026 · (* Dic backlog histórico · † Abr preliminar)';
   renderKPIs();
   updateCharts();
 }
@@ -769,7 +769,7 @@ function updateDashboard() {
   const isRet = currentTrack === 'retention';
   document.getElementById('periodLabel').textContent = isRet
     ? (currentTab === 'mensual' ? 'Mensual · Sep 2025 – Ene 2026 · († Sep–Oct sin volumen)' : 'Semanal · W37/25 – W09/26')
-    : 'Mensual · Dic 2025 – Mar 2026 · (* Dic backlog histórico · ⚠️ Mar ventana incompleta)';
+    : 'Mensual · Dic 2025 – Abr 2026 · (* Dic backlog histórico · † Abr preliminar)';
 
   document.getElementById('cvrSubtitle').textContent = isRet
     ? 'CVR = % con revenue en los 3d desde apertura push · control usa trigger_date como proxy'
@@ -786,7 +786,7 @@ function updateDashboard() {
 
   document.getElementById('dataNotes').innerHTML = isRet
     ? '<strong>Notas sobre los datos:</strong> &nbsp;† Sep–Oct 2025: comms sin volumen significativo (CVR &lt; 1%) — track recién iniciado. &nbsp;Revenue en USD (REVS_TOTAL_USD) — comparable entre todos los sites. &nbsp;Rev 3d negativo en Dic refleja estacionalidad; 30d y 60d son positivos. &nbsp;Meses más confiables: <strong>Nov 2025 – Ene 2026</strong>.'
-    : '<strong>Notas metodológicas:</strong> &nbsp;* Dic 2025: incluye backlog histórico — n_trat ~8x mayor. &nbsp;<strong>CVR trat</strong>: FRAME revenue &gt; 0 en 3d desde <strong>open_date</strong> (primera apertura de la comm); fallback a sent_date si no abrió. &nbsp;<strong>CVR ctrl</strong>: FRAME revenue &gt; 0 en 3d desde snapshot_date (Lun/Mar/Jue). &nbsp;<strong>Embudo</strong>: n_converted (FRAME) siempre ≥ n_last_click (GOLD T_event_date en 3d desde open). &nbsp;⚠️ Mar 2026: ventana 60d incompleta.';
+    : '<strong>Notas metodológicas:</strong> &nbsp;* Dic 2025: backlog histórico — n_trat ~8x mayor. &nbsp;† Abr 2026: preliminar — solo primera semana, revenues sin ventana completa. &nbsp;<strong>CVR trat</strong>: FRAME revenue &gt; 0 en 3d desde open_date; fallback a sent_date si no abrió. &nbsp;<strong>CVR ctrl</strong>: FRAME revenue &gt; 0 en 3d desde snapshot_date (Lun/Mar/Jue). &nbsp;<strong>Embudo</strong>: n_converted (FRAME) ≥ n_last_click (GOLD) — ambos en ventana 3d desde open. &nbsp;⚠️ Solo aplica a revenues (ventana 30d/60d), no a CVR ni embudo.';
 
   // Mostrar/ocultar embudo de atribución
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
@@ -854,7 +854,7 @@ function renderKPIs() {
   const ratioNote = isRet
     ? 'El seller genera el doble entre d31–d60'
     : 'Adquisición convierte más rápido que retención';
-  const periodNote = isRet ? 'Sep 2025 – Ene 2026' : 'Dic 2025 – Mar 2026';
+  const periodNote = isRet ? 'Sep 2025 – Ene 2026' : 'Dic 2025 – Abr 2026';
   const usersNote = isRet ? 'Todos los sites · desde Sep 2025' : 'Todos los sites · control ~5%';
 
   document.getElementById('kpiGrid').innerHTML = `
