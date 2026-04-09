@@ -1728,68 +1728,98 @@ ORDER BY 1</pre>
       <div class="chart-card" style="padding:20px 24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div>
-            <div class="chart-title">Query 2 — CVR por Sub_scope × Mes</div>
-            <div class="chart-subtitle" style="margin-bottom:0">Misma metodología · agrega sub_scope (enriquecido desde GROWTH_COMM_TARGET_AUDIENCE)</div>
+            <div class="chart-title">Query 2 — CVR por Sub_scope × Mes (open_date trigger)</div>
+            <div class="chart-subtitle" style="margin-bottom:0">Tablas: TURING_SILVER_COMM_PERFO · GROWTH_COMM_TARGET_AUDIENCE · GROWTH_COMM_TARGET_AUDIENCE_CONTROL · FRAME_DAILY_CAMPAIGN_KPIS</div>
           </div>
           <button onclick="copyQuery('qa2')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
         </div>
-        <pre id="qa2" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">-- Igual que Query 1 (pasos 1-4 idénticos), luego agrega sub_scope:
---
--- El sub_scope NO está en SILVER — viene del GROWTH_COMM_TARGET_AUDIENCE.
--- Hacemos un LEFT JOIN por user_id/site para enriquecer el tratamiento con su sub_scope.
--- El control ya tiene sub_scope directamente en la tabla.
---
--- ATENCIÓN: algunos sellers de SILVER pueden no tener sub_scope en GROWTH
--- (si entraron al audience antes de la ventana de análisis). Aparecen como 'sin sub_scope'.
-
--- ... (pasos 1-4 igual que Query 1) ...
-
--- PASO 5b: Sub_scope desde audience (enriquecimiento del tratamiento)
-sub_scope_trat AS (
+        <pre id="qa2" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">-- Igual que Query 1 en los pasos de silver/control/gold/frame_min,
+-- pero agrega sub_scope desde GROWTH_COMM_TARGET_AUDIENCE y agrupa por mes + sub_scope.
+-- El sub_scope NO está en SILVER — se enriquece via LEFT JOIN con el audience.
+WITH
+-- PASO 1: Silver con open_date (idéntico a Query 1)
+silver AS (
+  SELECT CAST(N_cust_adv_id AS INT64) AS user_id, S_site_id AS SITE_ID,
+    MIN(T_sent_date) AS sent_date,
+    MIN(CASE WHEN N_open > 0 THEN T_event_date END) AS open_date
+  FROM \`meli-sbox.MADSCOREBI.TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY\`
+  WHERE S_ambito = 'Acquisition' AND S_product = 'PADS'
+    AND T_sent_date >= '2025-12-01' AND T_sent_date &lt; CURRENT_DATE()
+  GROUP BY 1,2
+),
+-- PASO 2: Sub_scope del tratamiento desde audience
+sub_scope AS (
   SELECT user_id, SITE_ID, SUB_SCOPE AS sub_scope
   FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE\`
   WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
     AND SUB_SCOPE IN ('free trial','sin bonis','bonus')
-    AND SNAPSHOT_DATE >= '2025-12-01' AND SNAPSHOT_DATE &lt; '2026-04-01'
+    AND SNAPSHOT_DATE >= '2025-12-01' AND SNAPSHOT_DATE &lt; CURRENT_DATE()
     AND COALESCE(IS_CONTROL_GROUP, false) = false
   QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
 ),
-
--- PASO 7b: Agregación por mes + sub_scope
-trat_agg AS (
-  SELECT
-    DATE_TRUNC(t.sent_date, MONTH) AS cohort_month,
-    COALESCE(ss.sub_scope, 'sin sub_scope') AS sub_scope,
-    COUNT(*) AS n_trat,
-    COUNTIF(cvr=1) AS n_cvr
-  FROM trat_metrics t
-  LEFT JOIN sub_scope_trat ss ON t.user_id = ss.user_id AND t.SITE_ID = ss.SITE_ID
+-- PASO 3: Control Lun/Mar/Jue — ya tiene sub_scope directamente
+control AS (
+  SELECT user_id, SITE_ID, SUB_SCOPE AS sub_scope, SNAPSHOT_DATE AS trigger_date
+  FROM \`meli-bi-data.SBOX_ADVERTISINGDEMAND.GROWTH_COMM_TARGET_AUDIENCE_CONTROL\`
+  WHERE COMMUNICATION_TARGET IN ('target_acquisition','target_re_acquisition')
+    AND SUB_SCOPE IN ('free trial','sin bonis','bonus')
+    AND SNAPSHOT_DATE >= '2025-12-01' AND SNAPSHOT_DATE &lt; CURRENT_DATE()
+    AND EXTRACT(DAYOFWEEK FROM SNAPSHOT_DATE) IN (2, 3, 5)
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY user_id, SITE_ID ORDER BY SNAPSHOT_DATE ASC) = 1
+),
+-- PASO 4: FRAME primera fecha con revenue
+frame_min AS (
+  SELECT SELLER_ID, SIT_SITE_ID, MIN(FECHA) AS first_rev_date
+  FROM \`meli-sbox.MADSCOREBI.FRAME_DAILY_CAMPAIGN_KPIS\`
+  WHERE FECHA >= '2025-12-01' AND FECHA &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+    AND REVS_TOTAL_USD > 0
   GROUP BY 1,2
 ),
+-- PASO 5: Agregación tratamiento — CVR desde open_date, agrupado por mes + sub_scope
+trat_agg AS (
+  SELECT
+    DATE_TRUNC(s.sent_date, MONTH) AS cohort_month,
+    COALESCE(ss.sub_scope, 'sin sub_scope') AS sub_scope,
+    COUNT(*) AS n_trat,
+    COUNTIF(
+      fm.first_rev_date BETWEEN COALESCE(s.open_date, s.sent_date)
+      AND DATE_ADD(COALESCE(s.open_date, s.sent_date), INTERVAL 3 DAY)
+    ) AS n_cvr
+  FROM silver s
+  LEFT JOIN sub_scope ss ON s.user_id = ss.user_id AND s.SITE_ID = ss.SITE_ID
+  LEFT JOIN frame_min fm ON s.user_id = fm.SELLER_ID AND s.SITE_ID = fm.SIT_SITE_ID
+  WHERE DATE_ADD(COALESCE(s.open_date, s.sent_date), INTERVAL 3 DAY)
+        &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
+  GROUP BY 1,2
+),
+-- PASO 6: Agregación control — CVR desde trigger_date, agrupado por mes + sub_scope
 ctrl_agg AS (
   SELECT
     DATE_TRUNC(c.trigger_date, MONTH) AS cohort_month,
     c.sub_scope,
     COUNT(*) AS n_ctrl,
-    COUNTIF(cvr=1) AS n_cvr
-  FROM control c  -- el control ya tiene sub_scope
+    COUNTIF(
+      fm.first_rev_date BETWEEN c.trigger_date AND DATE_ADD(c.trigger_date, INTERVAL 3 DAY)
+    ) AS n_cvr
+  FROM control c
   LEFT JOIN frame_min fm ON c.user_id = fm.SELLER_ID AND c.SITE_ID = fm.SIT_SITE_ID
-  WHERE c.trigger_date &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -30 DAY)
+  WHERE DATE_ADD(c.trigger_date, INTERVAL 3 DAY) &lt;= DATE_ADD(CURRENT_DATE(), INTERVAL -1 DAY)
   GROUP BY 1,2
 )
 SELECT
-  FORMAT_DATE('%Y-%m', t.cohort_month) AS mes,
+  FORMAT_DATE('%b %Y', t.cohort_month) AS mes,
   t.sub_scope,
   t.n_trat, c.n_ctrl,
   t.n_cvr AS n_conv_trat, c.n_cvr AS n_conv_ctrl,
   ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100, 2) AS cvr_trat,
   ROUND(SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS cvr_ctrl,
-  ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100 - SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS cvr_uplift_pp,
+  ROUND(SAFE_DIVIDE(t.n_cvr, t.n_trat)*100 - SAFE_DIVIDE(c.n_cvr, c.n_ctrl)*100, 2) AS uplift_pp,
   ROUND(SAFE_DIVIDE(
     SAFE_DIVIDE(t.n_cvr, t.n_trat) - SAFE_DIVIDE(c.n_cvr, c.n_ctrl),
     SAFE_DIVIDE(c.n_cvr, c.n_ctrl)
-  )*100, 1) AS cvr_uplift_rel
+  )*100, 1) AS uplift_rel
 FROM trat_agg t JOIN ctrl_agg c ON t.cohort_month = c.cohort_month AND t.sub_scope = c.sub_scope
+WHERE t.sub_scope != 'sin sub_scope'
 ORDER BY t.cohort_month, t.sub_scope</pre>
       </div>
     `;
