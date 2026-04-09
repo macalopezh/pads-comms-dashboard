@@ -324,7 +324,7 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
   <div class="charts-grid">
     <div class="chart-card">
       <div class="chart-title">CVR — Tratamiento vs Control</div>
-      <div class="chart-subtitle" id="cvrSubtitle">CVR = % con revenue en los 3d desde apertura push · control usa trigger_date como proxy</div>
+      <div class="chart-subtitle" id="cvrSubtitle">CVR = % con revenue en los 3d desde apertura de cualquier comm del journey (open_date) · ventana de control válida: 28 días</div>
       <div class="chart-wrap"><canvas id="cvrChart"></canvas></div>
       <div class="stat-row" style="margin-top:12px;gap:16px">
         <span style="display:flex;align-items:center;gap:5px">
@@ -804,7 +804,7 @@ function switchTab(tab, btn) {
   btn.classList.add('active');
   const isRet = currentTrack === 'retention';
   document.getElementById('periodLabel').textContent = isRet
-    ? (tab === 'mensual' ? 'Mensual · Sep 2025 – Ene 2026 · († Sep–Oct sin volumen)' : 'Semanal · W37/25 – W09/26')
+    ? (tab === 'mensual' ? 'Mensual · Sep 2025 – Mar 2026 · († Sep–Oct sin volumen · ventana 28d)' : 'Semanal · W37/25 – W09/26')
     : 'Mensual · Dic 2025 – Abr 2026 · (* Dic backlog histórico · † Abr preliminar)';
   renderKPIs();
   updateCharts();
@@ -836,7 +836,7 @@ function updateDashboard() {
   // Actualizar textos contextuales
   const isRet = currentTrack === 'retention';
   document.getElementById('periodLabel').textContent = isRet
-    ? (currentTab === 'mensual' ? 'Mensual · Sep 2025 – Ene 2026 · († Sep–Oct sin volumen)' : 'Semanal · W37/25 – W09/26')
+    ? (currentTab === 'mensual' ? 'Mensual · Sep 2025 – Mar 2026 · († Sep–Oct sin volumen · ventana 28d)' : 'Semanal · W37/25 – W09/26')
     : 'Mensual · Dic 2025 – Abr 2026 · (* Dic backlog histórico · † Abr preliminar)';
 
   document.getElementById('cvrSubtitle').textContent = isRet
@@ -913,7 +913,7 @@ function renderKPIs() {
   };
 
   // Referencia: Ene 2026 para retención (idx 4 mensual), Ene 2026 para adquisición (idx 1)
-  const refIdx = isRet ? (currentTab === 'mensual' ? 4 : Math.floor(d.labels.length * 0.6)) : 2; // Feb 2026 = último mes con ventana 60d completa
+  const refIdx = isRet ? (currentTab === 'mensual' ? 6 : Math.floor(d.labels.length * 0.6)) : 2; // retención: Mar 2026 (idx 6) · adq: Feb 2026 (idx 2)
   const cvr_t_ref = d.cvr_treatment[refIdx];
   const cvr_c_ref = d.cvr_control[refIdx];
   const uplift_pp_ref  = (cvr_t_ref - cvr_c_ref).toFixed(2);
@@ -925,12 +925,12 @@ function renderKPIs() {
   const ratioNote = isRet
     ? 'El seller genera el doble entre d31–d60'
     : 'Adquisición convierte más rápido que retención';
-  const periodNote = isRet ? 'Sep 2025 – Ene 2026' : 'Dic 2025 – Abr 2026';
+  const periodNote = isRet ? 'Sep 2025 – Mar 2026' : 'Dic 2025 – Abr 2026';
   const usersNote = isRet ? 'Todos los sites · desde Sep 2025' : 'Todos los sites · control ~5%';
 
   document.getElementById('kpiGrid').innerHTML = `
     <div class="kpi-card positive">
-      <div class="kpi-label">CVR Uplift · ${isRet ? 'Ene 2026' : 'Feb 2026'}</div>
+      <div class="kpi-label">CVR Uplift · ${isRet ? 'Mar 2026' : 'Feb 2026'}</div>
       <div class="kpi-value">+${uplift_pp_ref}pp</div>
       <span class="kpi-delta up">▲ ${uplift_rel_ref}% relativo</span>
       <div class="kpi-sub">${cvr_t_ref}% trat. vs ${cvr_c_ref}% ctrl</div>
@@ -942,7 +942,7 @@ function renderKPIs() {
       <div class="kpi-sub">USD · ${revenueWindow}d post-trigger vs control</div>
     </div>
     <div class="kpi-card positive">
-      <div class="kpi-label">Ratio Revenue 60d / 30d · ${isRet ? 'Ene 2026' : 'Feb 2026'}</div>
+      <div class="kpi-label">Ratio Revenue 60d / 30d · ${isRet ? 'Mar 2026' : 'Feb 2026'}</div>
       <div class="kpi-value">${ratioRef}</div>
       <span class="kpi-delta up">▲ 60d recomendado</span>
       <div class="kpi-sub">${ratioNote}</div>
