@@ -371,37 +371,13 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
   </div>
   <div class="breakdown-grid" id="breakdownGrid"></div>
 
-  <!-- Sub_scope × Mes table — solo adquisición -->
+  <!-- Sub_scope × Mes — solo adquisición — cards por sub_scope -->
   <div id="subscopeMesSection" style="display:none;margin-top:24px">
     <div class="section-header">
-      <span class="section-title">CVR por Sub_scope y Mes</span>
-      <span class="section-tag">Dic 2025 – Mar 2026 · Opción B · mismo universo de partida</span>
+      <span class="section-title">CVR por Sub_scope — evolución mensual</span>
+      <span class="section-tag">Dic 2025 – Abr 2026 · open_date trigger</span>
     </div>
-    <div class="chart-card" style="padding:0;overflow:hidden">
-      <table id="subscopeMesTable" style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead>
-          <tr style="background:#1C1C28;">
-            <th style="padding:12px 16px;text-align:left;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Sub_scope</th>
-            <th style="padding:12px 16px;text-align:left;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Mes</th>
-            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">n trat</th>
-            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">n ctrl</th>
-            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">n conv trat</th>
-            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">n conv ctrl</th>
-            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">CVR trat</th>
-            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">CVR ctrl</th>
-            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Uplift pp</th>
-            <th style="padding:12px 16px;text-align:right;font-weight:700;color:#FFE600;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Uplift rel</th>
-          </tr>
-        </thead>
-        <tbody id="subscopeMesBody"></tbody>
-      </table>
-    </div>
-    <div style="background:var(--caution-quiet);border:1px solid #f5c87a;border-radius:var(--r-8);padding:10px 16px;font-size:12px;color:var(--caution-loud);margin-top:8px">
-      <strong>Notas:</strong>
-      &nbsp;* Dic 2025: backlog histórico — n_trat inflado, usar como referencia.
-      &nbsp;Bonus Ene/Feb: n_ctrl muy chico (&lt;250) — CVR ctrl inestable, uplift no confiable.
-      &nbsp;Free Trial Mar: n_trat=61 — comm pausada o redirigida en marzo.
-    </div>
+    <div id="subscopeMesCards" style="display:flex;flex-direction:column;gap:16px"></div>
   </div>
 
   <!-- Queries section -->
@@ -694,20 +670,24 @@ const SUBSCOPE_DATA = {
   'Free Trial': { cvr_t: 1.88, cvr_c: 0.55, cvr_uplift_rel: 243.3, n:  45019, revs_incr:   56203 },
 };
 
-// Sub_scope × Mes (Dic 2025 – Mar 2026, opción B)
+// Sub_scope × Mes · CVR desde open_date · Dic 2025 – Abr 2026
+// ⚠️ = n_trat < 100 (no confiable) · * = Dic backlog histórico · † = Abr preliminar
 const SUBSCOPE_MES_DATA = [
-  { mes: 'Dic 2025', sub_scope: 'bonus',      n_trat:  6150, n_ctrl:  361, n_conv_trat: 472, n_conv_ctrl: 18, cvr_trat: 7.67, cvr_ctrl: 4.99, uplift_pp:  2.69, uplift_rel:  53.9 },
-  { mes: 'Dic 2025', sub_scope: 'free trial', n_trat: 37436, n_ctrl: 2530, n_conv_trat: 333, n_conv_ctrl:  7, cvr_trat: 0.89, cvr_ctrl: 0.28, uplift_pp:  0.61, uplift_rel: 221.5 },
-  { mes: 'Dic 2025', sub_scope: 'sin bonis',  n_trat:330492, n_ctrl:19695, n_conv_trat:4488, n_conv_ctrl: 75, cvr_trat: 1.36, cvr_ctrl: 0.38, uplift_pp:  0.98, uplift_rel: 256.6 },
-  { mes: 'Ene 2026', sub_scope: 'bonus',      n_trat:   461, n_ctrl:  232, n_conv_trat:  26, n_conv_ctrl:  9, cvr_trat: 5.64, cvr_ctrl: 3.88, uplift_pp:  1.76, uplift_rel:  45.4 },
-  { mes: 'Ene 2026', sub_scope: 'free trial', n_trat:  3140, n_ctrl: 2363, n_conv_trat:  21, n_conv_ctrl:  7, cvr_trat: 0.67, cvr_ctrl: 0.30, uplift_pp:  0.37, uplift_rel: 125.8 },
-  { mes: 'Ene 2026', sub_scope: 'sin bonis',  n_trat: 34893, n_ctrl:20994, n_conv_trat: 683, n_conv_ctrl:124, cvr_trat: 1.96, cvr_ctrl: 0.59, uplift_pp:  1.37, uplift_rel: 231.4 },
-  { mes: 'Feb 2026', sub_scope: 'bonus',      n_trat:  1356, n_ctrl:  228, n_conv_trat:  39, n_conv_ctrl:  6, cvr_trat: 2.88, cvr_ctrl: 2.63, uplift_pp:  0.24, uplift_rel:   9.3 },
-  { mes: 'Feb 2026', sub_scope: 'free trial', n_trat:  4575, n_ctrl: 2305, n_conv_trat:  54, n_conv_ctrl: 24, cvr_trat: 1.18, cvr_ctrl: 1.04, uplift_pp:  0.14, uplift_rel:  13.4 },
-  { mes: 'Feb 2026', sub_scope: 'sin bonis',  n_trat: 67897, n_ctrl:20993, n_conv_trat:1488, n_conv_ctrl:162, cvr_trat: 2.19, cvr_ctrl: 0.77, uplift_pp:  1.42, uplift_rel: 184.0 },
-  { mes: 'Mar 2026', sub_scope: 'bonus',      n_trat:   183, n_ctrl:  206, n_conv_trat:  12, n_conv_ctrl:  3, cvr_trat: 6.56, cvr_ctrl: 1.46, uplift_pp:  5.10, uplift_rel: 350.3 },
-  { mes: 'Mar 2026', sub_scope: 'free trial', n_trat:    59, n_ctrl: 2505, n_conv_trat:   1, n_conv_ctrl: 19, cvr_trat: 1.69, cvr_ctrl: 0.76, uplift_pp:  0.94, uplift_rel: 123.5 },
-  { mes: 'Mar 2026', sub_scope: 'sin bonis',  n_trat: 13338, n_ctrl:21576, n_conv_trat: 254, n_conv_ctrl: 97, cvr_trat: 1.90, cvr_ctrl: 0.45, uplift_pp:  1.45, uplift_rel: 323.6 },
+  { mes: 'Dic 2025*', sub_scope: 'bonus',      n_trat:  6052, n_ctrl:  361, cvr_trat: 8.67, cvr_ctrl: 4.99, uplift_rel:  74.0, warn: false },
+  { mes: 'Dic 2025*', sub_scope: 'free trial', n_trat: 36924, n_ctrl: 2530, cvr_trat: 2.00, cvr_ctrl: 0.28, uplift_rel: 622.4, warn: false },
+  { mes: 'Dic 2025*', sub_scope: 'sin bonis',  n_trat:327963, n_ctrl:19695, cvr_trat: 1.96, cvr_ctrl: 0.38, uplift_rel: 413.9, warn: false },
+  { mes: 'Ene 2026',  sub_scope: 'bonus',      n_trat:   459, n_ctrl:  232, cvr_trat: 8.50, cvr_ctrl: 3.88, uplift_rel: 119.0, warn: false },
+  { mes: 'Ene 2026',  sub_scope: 'free trial', n_trat:  3097, n_ctrl: 2363, cvr_trat: 1.13, cvr_ctrl: 0.30, uplift_rel: 281.5, warn: false },
+  { mes: 'Ene 2026',  sub_scope: 'sin bonis',  n_trat: 34649, n_ctrl:20994, cvr_trat: 2.97, cvr_ctrl: 0.59, uplift_rel: 403.3, warn: false },
+  { mes: 'Feb 2026',  sub_scope: 'bonus',      n_trat:  1346, n_ctrl:  228, cvr_trat: 3.49, cvr_ctrl: 2.63, uplift_rel:  32.7, warn: false },
+  { mes: 'Feb 2026',  sub_scope: 'free trial', n_trat:  4499, n_ctrl: 2305, cvr_trat: 1.53, cvr_ctrl: 1.04, uplift_rel:  47.3, warn: false },
+  { mes: 'Feb 2026',  sub_scope: 'sin bonis',  n_trat: 66911, n_ctrl:20993, cvr_trat: 2.90, cvr_ctrl: 0.77, uplift_rel: 275.3, warn: false },
+  { mes: 'Mar 2026',  sub_scope: 'bonus',      n_trat:   837, n_ctrl:  264, cvr_trat: 2.99, cvr_ctrl: 1.14, uplift_rel: 162.8, warn: false },
+  { mes: 'Mar 2026',  sub_scope: 'free trial', n_trat:   492, n_ctrl: 2507, cvr_trat: 0.81, cvr_ctrl: 0.76, uplift_rel:   7.3, warn: false },
+  { mes: 'Mar 2026',  sub_scope: 'sin bonis',  n_trat: 50722, n_ctrl:24351, cvr_trat: 2.61, cvr_ctrl: 0.69, uplift_rel: 276.7, warn: false },
+  { mes: 'Abr 2026†', sub_scope: 'bonus',      n_trat:    15, n_ctrl:  174, cvr_trat: 0.00, cvr_ctrl: 0.00, uplift_rel:  null, warn: true  },
+  { mes: 'Abr 2026†', sub_scope: 'free trial', n_trat:     7, n_ctrl: 2169, cvr_trat: 0.00, cvr_ctrl: 0.37, uplift_rel:  null, warn: true  },
+  { mes: 'Abr 2026†', sub_scope: 'sin bonis',  n_trat:  1907, n_ctrl:19836, cvr_trat: 4.35, cvr_ctrl: 0.29, uplift_rel:1388.5, warn: false },
 ];
 
 // ─────────────────────────────────────────
@@ -778,10 +758,10 @@ function updateDashboard() {
 
   document.getElementById('upliftChartTitle').textContent = isRet
     ? 'CVR Uplift Relativo % — por Journey Cause'
-    : 'CVR Uplift Relativo % — por Sub_scope';
+    : 'CVR Tratamiento vs Control — por Sub_scope';
   document.getElementById('upliftChartSubtitle').textContent = isRet
     ? 'Uplift porcentual de conversión por causa de ingreso al track · acumulado'
-    : 'Uplift porcentual de conversión por tipo de campaña · acumulado Dic 2025 – Feb 2026';
+    : 'CVR % tratamiento (sólido) vs control (transparente) · acumulado Dic 2025 – Abr 2026 · open_date trigger';
 
   document.getElementById('breakdownTitle').textContent = isRet ? 'Detalle por Journey Cause' : 'Detalle por Sub_scope';
 
@@ -984,38 +964,83 @@ function renderCharts() {
     upliftLabels = Object.keys(JOURNEY_DATA);
     upliftVals = upliftLabels.map(k => ((JOURNEY_DATA[k].cvr_t - JOURNEY_DATA[k].cvr_c) / JOURNEY_DATA[k].cvr_c * 100).toFixed(1));
     upliftColors = ['#434ce4','#1f8923','#d74009','#646587'];
-  } else {
-    upliftLabels = Object.keys(SUBSCOPE_DATA);
-    upliftVals = upliftLabels.map(k => SUBSCOPE_DATA[k].cvr_uplift_rel);
-    upliftColors = upliftVals.map(v => v < 0 ? '#d74009' : v >= 200 ? '#1f8923' : '#434ce4');
-  }
 
-  charts.uplift = new Chart(document.getElementById('upliftChart'), {
-    type: 'bar',
-    data: {
-      labels: upliftLabels,
-      datasets: [{
-        label: 'CVR Uplift Relativo %',
-        data: upliftVals,
-        backgroundColor: upliftColors,
-        borderRadius: 6,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      indexAxis: isRet ? 'x' : 'y',
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.raw > 0 ? '+' : ''}${ctx.raw}% CVR uplift` } }
+    charts.uplift = new Chart(document.getElementById('upliftChart'), {
+      type: 'bar',
+      data: {
+        labels: upliftLabels,
+        datasets: [{
+          label: 'CVR Uplift Relativo %',
+          data: upliftVals,
+          backgroundColor: upliftColors,
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
       },
-      scales: {
-        // Retención: barras verticales → % en eje Y · Adquisición: barras horizontales → % en eje X
-        x: { grid: { color: isRet ? 'transparent' : gridColor }, ticks: { callback: isRet ? undefined : v => v + '%' } },
-        y: { grid: { color: gridColor }, ticks: { callback: isRet ? (v => v + '%') : undefined } }
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` +${ctx.raw}% CVR uplift` } }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' } }
+        }
       }
-    }
-  });
+    });
+
+  } else {
+    // Adquisición: grouped bar CVR trat vs ctrl por sub_scope
+    // Lectura directa: ves el gap entre tratamiento y control en cada segmento
+    const ssKeys  = Object.keys(SUBSCOPE_DATA);
+    const ssColors = { 'Sin Bonis': '#1f8923', 'Bonus': '#434ce4', 'Free Trial': '#d74009' };
+
+    charts.uplift = new Chart(document.getElementById('upliftChart'), {
+      type: 'bar',
+      data: {
+        labels: ssKeys,
+        datasets: [
+          {
+            label: 'CVR Tratamiento',
+            data: ssKeys.map(k => SUBSCOPE_DATA[k].cvr_t),
+            backgroundColor: ssKeys.map(k => ssColors[k] || '#434ce4'),
+            borderRadius: 5,
+            barPercentage: 0.45,
+          },
+          {
+            label: 'CVR Control',
+            data: ssKeys.map(k => SUBSCOPE_DATA[k].cvr_c),
+            backgroundColor: ssKeys.map(k => (ssColors[k] || '#434ce4') + '33'),
+            borderColor: ssKeys.map(k => ssColors[k] || '#434ce4'),
+            borderWidth: 2,
+            borderRadius: 5,
+            barPercentage: 0.45,
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%`,
+              afterBody: items => {
+                const k = ssKeys[items[0].dataIndex];
+                const rel = SUBSCOPE_DATA[k].cvr_uplift_rel;
+                return [`Uplift: +${rel}%`];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { weight: 600 } } },
+          y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' }, beginAtZero: true }
+        }
+      }
+    });
+  }
 
   // Embudo de atribución (solo adquisición)
   if (!isRet) {
@@ -1464,33 +1489,84 @@ function renderBreakdown() {
 // SUB_SCOPE × MES TABLE
 // ─────────────────────────────────────────
 function renderSubscopeMes() {
-  const subscopeColors = { 'bonus': '#434ce4', 'free trial': '#d74009', 'sin bonis': '#1f8923' };
-  const pillClass = rel => rel < 0 ? 'pill-caution' : rel >= 100 ? 'pill-green' : rel >= 30 ? 'pill-blue' : 'pill-gray';
-  const fmt = n => n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n;
+  const container = document.getElementById('subscopeMesCards');
+  if (!container) return;
 
-  const tbody = document.getElementById('subscopeMesBody');
-  if (!tbody) return;
+  const subscopeColors  = { 'bonus': '#434ce4', 'free trial': '#d74009', 'sin bonis': '#1f8923' };
+  const subscopeIcons   = { 'bonus': '🎁', 'free trial': '🆓', 'sin bonis': '🏪' };
+  const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n;
+  const upliftColor = rel => rel === null ? '#AAAAAA' : rel < 0 ? '#E63946' : rel >= 200 ? '#00A650' : rel >= 50 ? '#434ce4' : '#888888';
+  const upliftBg    = rel => rel === null ? '#F0F0F0' : rel < 0 ? 'rgba(230,57,70,.1)' : rel >= 200 ? 'rgba(0,166,80,.1)' : rel >= 50 ? 'rgba(67,76,228,.1)' : '#F0F0F0';
 
-  let lastSub = '';
-  tbody.innerHTML = SUBSCOPE_MES_DATA.map((r, i) => {
-    const isNewSub = r.sub_scope !== lastSub;
-    lastSub = r.sub_scope;
-    const color = subscopeColors[r.sub_scope] || '#646587';
-    const rowBg = isNewSub && i > 0 ? 'border-top:2px solid var(--border-primary);' : '';
-    const upliftFmt = (r.uplift_rel > 0 ? '+' : '') + r.uplift_rel + '%';
-    const warning = (r.n_ctrl < 300 || r.n_trat < 200) ? ' ⚠️' : '';
-    return `<tr style="border-bottom:1px solid var(--border-primary);${rowBg}">
-      <td style="padding:10px 16px;font-weight:600;color:${color}">${isNewSub ? r.sub_scope : ''}</td>
-      <td style="padding:10px 16px;color:var(--text-secondary)">${r.mes}</td>
-      <td style="padding:10px 16px;text-align:right">${fmt(r.n_trat)}</td>
-      <td style="padding:10px 16px;text-align:right;color:var(--text-secondary)">${fmt(r.n_ctrl)}${warning}</td>
-      <td style="padding:10px 16px;text-align:right">${fmt(r.n_conv_trat)}</td>
-      <td style="padding:10px 16px;text-align:right;color:var(--text-secondary)">${r.n_conv_ctrl}</td>
-      <td style="padding:10px 16px;text-align:right;font-weight:700">${r.cvr_trat}%</td>
-      <td style="padding:10px 16px;text-align:right;color:var(--text-secondary)">${r.cvr_ctrl}%</td>
-      <td style="padding:10px 16px;text-align:right">${r.uplift_pp > 0 ? '+' : ''}${r.uplift_pp}pp</td>
-      <td style="padding:10px 16px;text-align:right"><span class="pill ${pillClass(r.uplift_rel)}" style="font-size:11px">${upliftFmt}</span></td>
-    </tr>`;
+  // Agrupar por sub_scope
+  const scopes = [...new Set(SUBSCOPE_MES_DATA.map(r => r.sub_scope))];
+
+  container.innerHTML = scopes.map(scope => {
+    const rows = SUBSCOPE_MES_DATA.filter(r => r.sub_scope === scope);
+    const color = subscopeColors[scope] || '#646587';
+    const icon  = subscopeIcons[scope] || '';
+    const maxCVR = Math.max(...rows.map(r => r.cvr_trat), ...rows.map(r => r.cvr_ctrl), 0.1);
+
+    const monthCols = rows.map(r => {
+      const warn = r.warn ? '⚠️ ' : '';
+      const upliftFmt = r.uplift_rel === null ? 'n/a' : (r.uplift_rel > 0 ? '+' : '') + r.uplift_rel + '%';
+      const barT = Math.round(SAFE_DIV(r.cvr_trat, maxCVR) * 100);
+      const barC = Math.round(SAFE_DIV(r.cvr_ctrl, maxCVR) * 100);
+      return `
+        <div style="flex:1;min-width:100px;padding:12px 14px;border-left:1px solid var(--border-primary)">
+          <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">${warn}${r.mes}</div>
+          <!-- Barra de comparación visual -->
+          <div style="margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></div>
+              <div style="flex:1;height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden">
+                <div style="width:${barT}%;height:100%;background:${color};border-radius:3px;transition:width .3s"></div>
+              </div>
+              <span style="font-size:12px;font-weight:700;color:var(--text-primary);min-width:36px;text-align:right">${r.cvr_trat}%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="width:8px;height:8px;border-radius:50%;background:var(--border-primary);flex-shrink:0"></div>
+              <div style="flex:1;height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden">
+                <div style="width:${barC}%;height:100%;background:#AAAAAA;border-radius:3px;transition:width .3s"></div>
+              </div>
+              <span style="font-size:12px;color:var(--text-secondary);min-width:36px;text-align:right">${r.cvr_ctrl}%</span>
+            </div>
+          </div>
+          <!-- Uplift pill -->
+          <div style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:${upliftBg(r.uplift_rel)};color:${upliftColor(r.uplift_rel)};font-size:11px;font-weight:700">
+            ${upliftFmt}
+          </div>
+          <div style="font-size:10px;color:var(--text-disabled);margin-top:4px">${fmt(r.n_trat)} sellers</div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="chart-card" style="padding:0;overflow:hidden">
+        <div style="display:flex;align-items:stretch">
+          <!-- Header izquierdo con nombre del sub_scope -->
+          <div style="width:130px;flex-shrink:0;background:#1C1C28;padding:20px 16px;display:flex;flex-direction:column;justify-content:center">
+            <div style="font-size:20px;margin-bottom:4px">${icon}</div>
+            <div style="font-size:13px;font-weight:700;color:#FFFFFF;text-transform:capitalize">${scope}</div>
+            <div style="width:24px;height:3px;background:${color};border-radius:2px;margin-top:8px"></div>
+          </div>
+          <!-- Leyenda + meses -->
+          <div style="flex:1;display:flex;flex-direction:column">
+            <!-- Leyenda -->
+            <div style="display:flex;gap:16px;padding:8px 14px;border-bottom:1px solid var(--border-primary);background:var(--bg-secondary)">
+              <span style="font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span> Tratamiento
+              </span>
+              <span style="font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:4px">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#AAAAAA"></span> Control
+              </span>
+            </div>
+            <!-- Meses -->
+            <div style="display:flex;flex-wrap:nowrap;overflow-x:auto">
+              ${monthCols}
+            </div>
+          </div>
+        </div>
+      </div>`;
   }).join('');
 }
 
