@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <style>
 :root {
   /* PADs — Mercado Ads Internal Design System */
@@ -236,6 +237,24 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .charts-grid { grid-template-columns: 1fr; }
   .breakdown-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Query accordion inline ── */
+.query-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  background: var(--bg-secondary); border: 1px solid var(--border-primary);
+  border-radius: var(--r-full); padding: 3px 10px; cursor: pointer;
+  margin-top: 8px; transition: background .15s;
+}
+.query-toggle:hover { background: #1C1C28; color: #FFE600; border-color: #1C1C28; }
+.query-drawer { display: none; margin-top: 8px; }
+.query-drawer.open { display: block; }
+.query-drawer pre {
+  font-size: 11px; line-height: 1.6;
+  background: #1C1C28; color: #FFE600;
+  border-radius: var(--r-8); padding: 14px 16px;
+  overflow-x: auto; white-space: pre;
 }
 </style>
 </head>
@@ -728,19 +747,17 @@ const SEGUNDA_MITAD_DATA = [
 // ─────────────────────────────────────────
 const DATA_ADQ = {
   mensual: {
-    // CVR trat: FRAME revenue>0 en 3d desde open_date (si abrió) o sent_date (fallback)
-    // CVR ctrl: FRAME revenue>0 en 3d desde snapshot_date (Lun/Mar/Jue)
-    // ⚠️ solo aplica a revenue (ventana 30d/60d), NO a CVR ni embudo
-    // Abr 2026: preliminar — solo primera semana, n_trat bajo
+    // Actualizado: 13-Abr-2026 · CVR desde open_date (fallback sent_date)
+    // * Dic 2025: backlog histórico · † Abr 2026: mes en curso, sin ventana 30d/60d
     labels: ['Dic 2025 *', 'Ene 2026', 'Feb 2026', 'Mar 2026', 'Abr 2026 †'],
-    cvr_treatment: [2.07, 2.87, 2.81, 2.58, 4.14],
-    cvr_control:   [0.44, 0.59, 0.82, 0.70, 0.30],
-    rev_incr_30d:  [0,  3263,  1518,  1611,  0],  // Abr y Dic sin ventana 30d completa
+    cvr_treatment: [2.10, 2.91, 2.88, 2.74, 3.34],
+    cvr_control:   [0.44, 0.59, 0.82, 0.70, 0.38],
+    rev_incr_30d:  [0,  3263,  1518,  1611,  0],
     rev_incr_60d:  [0,  3315,  2467,  1966,  0],
-    n_treatment:   [371422, 38456, 73035, 52432,  2006],
-    n_control:     [ 22586, 23589, 23526, 27122, 22179],
-    n_converted:   [ 7694,  1105,  2054,  1355,    83],
-    n_last_click:  [ 3581,   659,   990,   753,     5],
+    n_treatment:   [374218, 38709, 74018, 54227, 13980],
+    n_control:     [ 22586, 23589, 23526, 27122, 25312],
+    n_converted:   [ 7860,  1125,  2134,  1486,   467],
+    n_last_click:  [ 3775,   676,  1084,   929,   185],
   }
 };
 // Acumulado Dic 2025 – Mar 2026 por sub_scope (opción B: mismo universo partida)
@@ -793,6 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Retención es el track por defecto
   renderTouchpointChart();
   renderSegundaMitadChart();
+  injectQueryToggles(true); // retención por defecto
 });
 
 // ─────────────────────────────────────────
@@ -855,6 +873,9 @@ function updateDashboard() {
   document.getElementById('dataNotes').innerHTML = isRet
     ? '<strong>Notas sobre los datos:</strong> &nbsp;† Sep–Oct 2025: comms sin volumen significativo (CVR &lt; 1%) — track recién iniciado. &nbsp;Revenue en USD (REVS_TOTAL_USD) — comparable entre todos los sites. &nbsp;Rev 3d negativo en Dic refleja estacionalidad; 30d y 60d son positivos. &nbsp;Meses más confiables: <strong>Nov 2025 – Ene 2026</strong>.'
     : '<strong>Notas metodológicas:</strong> &nbsp;* Dic 2025: backlog histórico — n_trat ~8x mayor. &nbsp;† Abr 2026: preliminar — solo primera semana, revenues sin ventana completa. &nbsp;<strong>CVR trat</strong>: FRAME revenue &gt; 0 en 3d desde open_date; fallback a sent_date si no abrió. &nbsp;<strong>CVR ctrl</strong>: FRAME revenue &gt; 0 en 3d desde snapshot_date (Lun/Mar/Jue). &nbsp;<strong>Embudo</strong>: n_converted (FRAME) ≥ n_last_click (GOLD) — ambos en ventana 3d desde open. &nbsp;⚠️ Solo aplica a revenues (ventana 30d/60d), no a CVR ni embudo.';
+
+  // Inyectar / limpiar toggles de queries en los chart cards
+  injectQueryToggles(isRet);
 
   // Mostrar/ocultar embudo de atribución
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
@@ -967,6 +988,10 @@ const chartDefaults = {
 };
 Chart.defaults.font = chartDefaults.font;
 Chart.defaults.color = chartDefaults.color;
+// Registrar plugin de data labels (disponible globalmente)
+if (typeof ChartDataLabels !== 'undefined') {
+  Chart.register(ChartDataLabels);
+}
 
 function renderCharts() {
   const isRet = currentTrack === 'retention';
@@ -1006,8 +1031,18 @@ function renderCharts() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false,
-        callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } },
+        datalabels: !isRet ? {
+          display: ctx => ctx.datasetIndex === 0,  // solo tratamiento
+          align: 'top', anchor: 'end',
+          formatter: v => v + '%',
+          font: { size: 10, weight: 700 },
+          color: '#1C1C28',
+          padding: 3
+        } : false
+      },
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 0 } },
         y: { grid: { color: gridColor }, ticks: { callback: v => v+'%' }, beginAtZero: true }
@@ -1030,14 +1065,20 @@ function renderCharts() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: {
-        callbacks: { label: ctx => {
-          const v = ctx.raw;
-          const abs = Math.abs(v), sign = v < 0 ? '-' : '';
-          const fmt = abs >= 1e6 ? sign+'$'+(abs/1e6).toFixed(2)+'M' : abs >= 1e3 ? sign+'$'+(abs/1e3).toFixed(1)+'K' : sign+'$'+abs;
-          return ` ${fmt} USD`;
-        }}
-      }},
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => {
+          const v = ctx.raw, abs = Math.abs(v), sign = v < 0 ? '-' : '';
+          return ` ${sign}${abs >= 1e6 ? '$'+(abs/1e6).toFixed(2)+'M' : abs >= 1e3 ? '$'+(abs/1e3).toFixed(1)+'K' : '$'+abs} USD`;
+        }}},
+        datalabels: !isRet ? {
+          display: ctx => ctx.raw !== 0,
+          anchor: ctx => ctx.raw < 0 ? 'start' : 'end',
+          align: ctx => ctx.raw < 0 ? 'bottom' : 'top',
+          formatter: v => { const abs = Math.abs(v); return (v<0?'-':'')+(abs>=1e6?'$'+(abs/1e6).toFixed(1)+'M':abs>=1e3?'$'+(abs/1e3).toFixed(0)+'K':'$'+abs); },
+          font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 3
+        } : false
+      },
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 0 } },
         y: { grid: { color: gridColor }, ticks: { callback: v => {
@@ -1188,6 +1229,72 @@ function renderCharts() {
 }
 
 function SAFE_DIV(a, b) { return b === 0 ? 0 : a / b; }
+
+function toggleQuery(id) {
+  const drawer = document.getElementById(id);
+  if (!drawer) return;
+  drawer.classList.toggle('open');
+  const btn = drawer.previousElementSibling;
+  if (btn) btn.textContent = drawer.classList.contains('open') ? '▲ Ocultar query' : '{ } Ver query';
+}
+
+function copyQueryFromDrawer(drawerId) {
+  const el = document.getElementById(drawerId);
+  if (el) navigator.clipboard.writeText(el.querySelector('pre')?.textContent || '').then(() => {});
+}
+
+// Queries como strings para inyectar en los accordions
+const Q_ADQ_CVR_INLINE = `-- CVR mensual: SILVER trigger (open_date) vs control Lun/Mar/Jue
+-- Ver Query 1 completa en la sección "Queries BigQuery" abajo`;
+
+const Q_ADQ_REVENUE_INLINE = `-- Revenue incremental: (avg_rev_trat - avg_rev_ctrl) × n_last_click
+-- n_last_click = sellers con GOLD N_conversion=1 en 3d desde open_date
+-- Ver Query 1 completa en la sección "Queries BigQuery" abajo`;
+
+const Q_ADQ_SUBSCOPE_INLINE = `-- CVR por sub_scope acumulado: open_date trigger
+-- Ver Query 2 completa en la sección "Queries BigQuery" abajo`;
+
+const Q_ADQ_FUNNEL_INLINE = `-- Embudo atribución: n_conv (FRAME) vs n_last_click (GOLD)
+-- Ver Query 1 completa en la sección "Queries BigQuery" abajo`;
+
+function injectQueryToggles(isRet) {
+  // Pares: [chartCardSelector, queryId, querySQL]
+  const targets = isRet ? [] : [
+    ['cvrChart', 'iqCvr',     Q_ADQ_CVR_INLINE],
+    ['revenueChart', 'iqRev', Q_ADQ_REVENUE_INLINE],
+    ['upliftChart',  'iqSub', Q_ADQ_SUBSCOPE_INLINE],
+    ['attrFunnelChart', 'iqFunnel', Q_ADQ_FUNNEL_INLINE],
+  ];
+
+  // Limpiar toggles anteriores
+  document.querySelectorAll('.query-toggle-inline, .query-drawer-inline').forEach(el => el.remove());
+
+  targets.forEach(([canvasId, qid, sql]) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const card = canvas.closest('.chart-card');
+    if (!card) return;
+
+    const toggle = document.createElement('button');
+    toggle.className = 'query-toggle query-toggle-inline';
+    toggle.id = `btn_${qid}`;
+    toggle.textContent = '{ } Ver query';
+    toggle.onclick = () => {
+      const d = document.getElementById(`drawer_${qid}`);
+      if (!d) return;
+      d.classList.toggle('open');
+      toggle.textContent = d.classList.contains('open') ? '▲ Ocultar query' : '{ } Ver query';
+    };
+
+    const drawer = document.createElement('div');
+    drawer.className = 'query-drawer query-drawer-inline';
+    drawer.id = `drawer_${qid}`;
+    drawer.innerHTML = `<pre style="white-space:pre-wrap">${sql}</pre>`;
+
+    card.appendChild(toggle);
+    card.appendChild(drawer);
+  });
+}
 
 // ─────────────────────────────────────────
 // PUBLICAR EN GITHUB PAGES
