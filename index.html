@@ -991,6 +991,8 @@ const chartDefaults = {
   color: '#646587',
 };
 Chart.defaults.font = chartDefaults.font;
+// Registrar plugin datalabels globalmente
+if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
 Chart.defaults.color = chartDefaults.color;
 // Registrar plugin de data labels (disponible globalmente)
 if (typeof ChartDataLabels !== 'undefined') {
