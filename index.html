@@ -395,7 +395,7 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
        ════════════════════════════════════════════════ -->
 
   <!-- 1. CVR por Touchpoint del Journey — solo retención -->
-  <div id="touchpointSection" style="display:;margin-top:32px">
+  <div id="touchpointSection" style="display:block;margin-top:32px">
     <div class="section-header">
       <span class="section-title">CVR por Punto de Contacto del Journey</span>
       <span class="section-tag">Dic 2025 – Mar 2026 · acumulado</span>
@@ -422,7 +422,7 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
   </div>
 
   <!-- 2. Experimento 2da mitad del journey — solo retención -->
-  <div id="segundaMitadSection" style="display:none;margin-top:24px">
+  <div id="segundaMitadSection" style="display:block;margin-top:24px">
     <div class="section-header">
       <span class="section-title">¿Vale la pena la 2da mitad del journey? (días 35-63)</span>
       <span class="section-tag">Experimento observacional · Dic 2025 – Mar 2026</span>
@@ -890,8 +890,8 @@ function updateDashboard() {
   // Mostrar/ocultar embudo de atribución
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
   document.getElementById('subscopeMesSection').style.display = isRet ? 'none' : '';
-  document.getElementById('touchpointSection').style.display = isRet ? '' : 'none';
-  document.getElementById('segundaMitadSection').style.display = isRet ? '' : 'none';
+  document.getElementById('touchpointSection').style.display = isRet ? 'block' : 'none';
+  document.getElementById('segundaMitadSection').style.display = isRet ? 'block' : 'none';
   if (!isRet) renderSubscopeMes();
   if (isRet) { renderTouchpointChart(); renderSegundaMitadChart(); }
 
