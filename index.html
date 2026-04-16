@@ -395,7 +395,7 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
        ════════════════════════════════════════════════ -->
 
   <!-- 1. CVR por Touchpoint del Journey — solo retención -->
-  <div id="touchpointSection" style="display:none;margin-top:32px">
+  <div id="touchpointSection" style="display:;margin-top:32px">
     <div class="section-header">
       <span class="section-title">CVR por Punto de Contacto del Journey</span>
       <span class="section-tag">Dic 2025 – Mar 2026 · acumulado</span>
@@ -1156,7 +1156,13 @@ function renderCharts() {
               }
             }
           },
-          datalabels: false
+          datalabels: {
+            display: true, anchor: 'end', align: 'top',
+            formatter: v => v + '%',
+            font: ctx => ({ size: 10, weight: ctx.datasetIndex === 0 ? 700 : 600 }),
+            color: ctx => ctx.datasetIndex === 0 ? '#1C1C28' : '#888888',
+            padding: 2
+          }
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { weight: 600 } } },
@@ -1793,7 +1799,13 @@ function renderTouchpointChart() {
             }
           }
         },
-        datalabels: false  // desactivar global, cada dataset tiene el suyo
+        datalabels: {
+            display: true, anchor: 'end', align: 'top',
+            formatter: v => v !== null ? v + '%' : '',
+            font: ctx => ({ size: 10, weight: ctx.datasetIndex === 0 ? 700 : 600 }),
+            color: ctx => ctx.datasetIndex === 0 ? '#1C1C28' : '#888888',
+            padding: 2
+          }
       },
       scales: {
         x: { grid: { display: false } },
@@ -1834,7 +1846,11 @@ function renderTouchpointChart() {
             return [`Open rate: ${d.open_rate}% · n=${(d.n_delivered/1000).toFixed(0)}K`, '⚠️ Ctrl rotó a tratamiento — benchmark inválido'];
           }
         }},
-        datalabels: false
+        datalabels: {
+            display: true, anchor: 'end', align: 'top',
+            formatter: v => v + '%',
+            font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 2
+          }
       },
       scales: {
         x: { grid: { display: false } },
