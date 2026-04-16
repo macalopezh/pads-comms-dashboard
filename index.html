@@ -402,16 +402,22 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
     </div>
     <div style="background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:14px 18px;font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6">
       <strong style="color:var(--text-primary)">¿Qué muestra este gráfico?</strong>
-      Para cada comunicación del journey (días 0, 4, 7, 14, 21, 28, 35…), medimos qué % de sellers convirtieron
-      en los 3 días siguientes a abrirla. <br>
-      <strong style="color:#00A650">● Días 0-28</strong>: comparación válida con grupo de control —
-      el grupo de control no recibe comms durante el primer mes, por lo que la diferencia es atribuible al journey.<br>
-      <strong style="color:#E63946">● Días 35-63</strong>: solo CVR de tratamiento, <em>sin benchmark válido</em> —
-      el 78% del grupo de control rota a tratamiento al mes siguiente y empieza a recibir comms,
-      por lo que ya no es un grupo limpio de comparación.
+      CVR de tratamiento vs control en cada punto de contacto del journey (días 0, 4, 7, 14, 21, 28).
+      Útil para detectar si alguna comm específica tiene CVR muy baja o si el control la supera. <br>
+      <strong style="color:#00A650">● Días 0-28</strong>: comparación válida — el control no recibe comms durante el primer mes.<br>
+      <strong style="color:#E63946">● Días 35-63</strong>: solo CVR de tratamiento (sin benchmark) — el 78% del control rota a tratamiento al mes siguiente.
     </div>
-    <div class="chart-card">
-      <div class="chart-wrap" style="height:300px"><canvas id="touchpointChart"></canvas></div>
+    <div class="charts-grid" style="margin-bottom:0">
+      <div class="chart-card">
+        <div class="chart-title">Días 0-28 — Trat vs Control</div>
+        <div class="chart-subtitle">Ventana con grupo de control válido · CVR ambos grupos · Dic 2025–Mar 2026</div>
+        <div class="chart-wrap" style="height:260px"><canvas id="touchpointChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Días 35-63 — Solo Tratamiento ⚠️</div>
+        <div class="chart-subtitle">Sin control válido (ctrl rotó a tratamiento) · referencia de tendencia</div>
+        <div class="chart-wrap" style="height:260px"><canvas id="touchpointNoCtrlChart"></canvas></div>
+      </div>
     </div>
   </div>
 
@@ -866,10 +872,10 @@ function updateDashboard() {
     : 'CVR trat = FRAME revenue>0 en 3d desde apertura (open_date) · CVR ctrl = FRAME revenue>0 en 3d desde snapshot';
 
   document.getElementById('upliftChartTitle').textContent = isRet
-    ? 'CVR Uplift Relativo % — por Journey Cause'
+    ? 'CVR Tratamiento vs Control — por Journey Cause'
     : 'CVR Tratamiento vs Control — por Sub_scope';
   document.getElementById('upliftChartSubtitle').textContent = isRet
-    ? 'Uplift porcentual de conversión por causa de ingreso al track · acumulado'
+    ? 'CVR % tratamiento (sólido) vs control (transparente) por causa de ingreso · acumulado Dic 2025–Feb 2026'
     : 'CVR % tratamiento (sólido) vs control (transparente) · acumulado Dic 2025 – Abr 2026 · open_date trigger';
 
   document.getElementById('breakdownTitle').textContent = isRet ? 'Detalle por Journey Cause' : 'Detalle por Sub_scope';
@@ -1098,31 +1104,63 @@ function renderCharts() {
   // Uplift by journey cause (retention) or sub_scope (acquisition)
   let upliftLabels, upliftVals, upliftColors;
   if (isRet) {
+    // Retención: grouped bar CVR trat vs ctrl por Journey Cause
     upliftLabels = Object.keys(JOURNEY_DATA);
-    upliftVals = upliftLabels.map(k => ((JOURNEY_DATA[k].cvr_t - JOURNEY_DATA[k].cvr_c) / JOURNEY_DATA[k].cvr_c * 100).toFixed(1));
-    upliftColors = ['#434ce4','#1f8923','#d74009','#646587'];
+    const jColors = ['#434ce4','#1f8923','#d74009','#646587'];
 
     charts.uplift = new Chart(document.getElementById('upliftChart'), {
       type: 'bar',
       data: {
         labels: upliftLabels,
-        datasets: [{
-          label: 'CVR Uplift Relativo %',
-          data: upliftVals,
-          backgroundColor: upliftColors,
-          borderRadius: 6,
-          borderSkipped: false,
-        }]
+        datasets: [
+          {
+            label: 'CVR Tratamiento',
+            data: upliftLabels.map(k => JOURNEY_DATA[k].cvr_t),
+            backgroundColor: jColors,
+            borderRadius: 5,
+            barPercentage: 0.45,
+            datalabels: {
+              display: true, anchor: 'end', align: 'top',
+              formatter: v => v + '%',
+              font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 2
+            }
+          },
+          {
+            label: 'CVR Control',
+            data: upliftLabels.map(k => JOURNEY_DATA[k].cvr_c),
+            backgroundColor: jColors.map(c => c + '33'),
+            borderColor: jColors,
+            borderWidth: 2,
+            borderRadius: 5,
+            barPercentage: 0.45,
+            datalabels: {
+              display: true, anchor: 'end', align: 'top',
+              formatter: v => v + '%',
+              font: { size: 10, weight: 600 }, color: '#888888', padding: 2
+            }
+          }
+        ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: ctx => ` +${ctx.raw}% CVR uplift` } }
+          legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%`,
+              afterBody: items => {
+                const k = upliftLabels[items[0].dataIndex];
+                const d = JOURNEY_DATA[k];
+                const uplift = ((d.cvr_t - d.cvr_c) / d.cvr_c * 100).toFixed(1);
+                return [`Uplift: +${uplift}% · Rev incr: $${(d.revs_incr/1000).toFixed(0)}K`];
+              }
+            }
+          },
+          datalabels: false
         },
         scales: {
-          x: { grid: { display: false } },
-          y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' } }
+          x: { grid: { display: false }, ticks: { font: { weight: 600 } } },
+          y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' }, beginAtZero: true }
         }
       }
     });
@@ -1700,40 +1738,42 @@ function renderTouchpointChart() {
   if (charts.touchpoint) { charts.touchpoint.destroy(); delete charts.touchpoint; }
 
   const gridColor = 'rgba(228,232,240,.5)';
-  const labels = TOUCHPOINT_DATA.map(d => `Día ${d.dia}`);
-  const cvrTrat = TOUCHPOINT_DATA.map(d => d.cvr_trat);
-  const cvrCtrl = TOUCHPOINT_DATA.map(d => d.cvr_ctrl);
-  const hasCtrl = TOUCHPOINT_DATA.map(d => d.ctrl_valido);
 
-  // Colores: verde para ctrl válido, naranja para sin ctrl
-  const barColors = TOUCHPOINT_DATA.map(d => d.ctrl_valido ? 'rgba(67,76,228,.8)' : 'rgba(230,57,70,.7)');
+  // Separar días con ctrl válido (0-28) y sin ctrl (35+)
+  const valid = TOUCHPOINT_DATA.filter(d => d.ctrl_valido);
+  const noCtrl = TOUCHPOINT_DATA.filter(d => !d.ctrl_valido);
 
+  // Gráfico 1: días 0-28 — grouped bar trat vs ctrl
   charts.touchpoint = new Chart(el, {
     type: 'bar',
     data: {
-      labels,
+      labels: valid.map(d => `Día ${d.dia}`),
       datasets: [
         {
           label: 'CVR Tratamiento',
-          data: cvrTrat,
-          backgroundColor: barColors,
+          data: valid.map(d => d.cvr_trat),
+          backgroundColor: '#434ce4',
           borderRadius: 5,
-          order: 2,
+          barPercentage: 0.45,
+          datalabels: {
+            display: true, anchor: 'end', align: 'top',
+            formatter: v => v + '%',
+            font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 2
+          }
         },
         {
-          label: 'CVR Control (válido ≤28d)',
-          data: cvrCtrl,
-          type: 'line',
-          borderColor: '#888888',
-          backgroundColor: 'rgba(136,136,136,.1)',
+          label: 'CVR Control',
+          data: valid.map(d => d.cvr_ctrl),
+          backgroundColor: 'rgba(67,76,228,.2)',
+          borderColor: '#434ce4',
           borderWidth: 2,
-          borderDash: [5, 4],
-          pointRadius: TOUCHPOINT_DATA.map(d => d.ctrl_valido ? 5 : 0),
-          pointBackgroundColor: '#888888',
-          fill: false,
-          tension: .3,
-          order: 1,
-          spanGaps: false,
+          borderRadius: 5,
+          barPercentage: 0.45,
+          datalabels: {
+            display: true, anchor: 'end', align: 'top',
+            formatter: v => v + '%',
+            font: { size: 10, weight: 600 }, color: '#888888', padding: 2
+          }
         }
       ]
     },
@@ -1742,22 +1782,59 @@ function renderTouchpointChart() {
       plugins: {
         legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
         tooltip: {
+          mode: 'index', intersect: false,
           callbacks: {
-            label: ctx => {
-              if (ctx.datasetIndex === 0) return ` CVR trat: ${ctx.raw}%`;
-              if (ctx.raw === null) return null;
-              return ` CVR ctrl: ${ctx.raw}% ✓ válido`;
-            },
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%`,
             afterBody: items => {
               const i = items[0].dataIndex;
-              const d = TOUCHPOINT_DATA[i];
-              const lines = [`Open rate: ${d.open_rate}% · n=${(d.n_delivered/1000).toFixed(0)}K`];
-              if (!d.ctrl_valido) lines.push('⚠️ Sin control válido — ctrl rotó a tratamiento');
-              return lines;
+              const d = valid[i];
+              const uplift = d.uplift_rel !== null ? `+${d.uplift_rel}% uplift rel` : '';
+              return [`Open rate: ${d.open_rate}% · n=${(d.n_delivered/1000).toFixed(0)}K · ${uplift}`];
             }
           }
         },
-        annotation: {}
+        datalabels: false  // desactivar global, cada dataset tiene el suyo
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' }, beginAtZero: true }
+      }
+    }
+  });
+
+  // Gráfico 2 (días 35-63): solo CVR trat, sin ctrl — renderizado separado
+  const el2 = document.getElementById('touchpointNoCtrlChart');
+  if (!el2) return;
+  if (charts.touchpointNoCtrl) { charts.touchpointNoCtrl.destroy(); delete charts.touchpointNoCtrl; }
+  charts.touchpointNoCtrl = new Chart(el2, {
+    type: 'bar',
+    data: {
+      labels: noCtrl.map(d => `Día ${d.dia}`),
+      datasets: [{
+        label: 'CVR Tratamiento (sin ctrl válido)',
+        data: noCtrl.map(d => d.cvr_trat),
+        backgroundColor: 'rgba(230,57,70,.7)',
+        borderRadius: 5,
+        datalabels: {
+          display: true, anchor: 'end', align: 'top',
+          formatter: v => v + '%',
+          font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 2
+        }
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: ctx => ` CVR trat: ${ctx.raw}%`,
+          afterBody: items => {
+            const i = items[0].dataIndex;
+            const d = noCtrl[i];
+            return [`Open rate: ${d.open_rate}% · n=${(d.n_delivered/1000).toFixed(0)}K`, '⚠️ Ctrl rotó a tratamiento — benchmark inválido'];
+          }
+        }},
+        datalabels: false
       },
       scales: {
         x: { grid: { display: false } },
