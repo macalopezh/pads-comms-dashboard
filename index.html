@@ -672,7 +672,9 @@ const DATA = {
     // ⚠️ Mar 2026: revenue negativo — avg_rev control > tratamiento (composición del cohort)
     labels: ['Sep 2025 †','Oct 2025 †','Nov 2025','Dic 2025','Ene 2026','Feb 2026','Mar 2026 ⚠️'],
     cvr_treatment: [0.88,  2.18, 31.77, 14.29, 14.54, 13.00, 13.56],
-    cvr_control:   [0.00,  0.08,  0.09,  6.74,  6.34,  9.22, 13.07],
+    cvr_control:   [null,  null,  null,  6.74,  6.34,  9.22, 13.07],
+    // cvr_ctrl_proj: proyección para Sep/Oct/Nov donde n_ctrl es muy bajo (proyectado ~7% basado en Dic-Feb)
+    cvr_ctrl_proj: [7.0,   7.0,   7.0,  null,  null,  null,  null],
     open_rate:     [ 9.1,  19.8,  33.0,  33.0,  37.7,  39.0,  37.2],
     rev_incr_3d:   [   0,     0,       0,      0,      0,     0,      0],
     rev_incr_30d:  [ 293,  2691, 3097829,   9775,  86429, 35352,  -7052],
@@ -1016,6 +1018,8 @@ function renderCharts() {
   // CVR line chart
   // Preparar datasets — para semanal de retención agregar ctrl proyectado + lanzamiento
   const isSemRet = isRet && currentTab === 'semanal';
+  const hasProj = isRet && d.cvr_ctrl_proj;
+
   const cvrDatasets = [
     {
       label: 'Tratamiento',
@@ -1028,25 +1032,31 @@ function renderCharts() {
       label: 'Control',
       data: d.cvr_control,
       borderColor: '#b5b9d4', backgroundColor: 'rgba(181,185,212,.06)',
-      borderWidth: 2, borderDash: [5,4], pointRadius: d.cvr_control ? d.cvr_control.map(v => v !== null ? 3 : 0) : 3,
+      borderWidth: 2, borderDash: [5,4],
+      pointRadius: d.cvr_control ? d.cvr_control.map(v => v !== null ? 3 : 0) : 3,
       pointBackgroundColor: '#b5b9d4', fill: true, tension: .35, spanGaps: false,
     }
   ];
-  if (isSemRet && d.cvr_ctrl_proj) {
+
+  // Dataset proyectado — aplica a semanal Y mensual de retención
+  if (hasProj) {
     cvrDatasets.push({
-      label: 'Control proyectado (7.8%)',
+      label: 'Control proyectado (~7%)',
       data: d.cvr_ctrl_proj,
-      borderColor: '#AAAAAA', backgroundColor: 'transparent',
+      borderColor: '#AAAAAA', backgroundColor: 'rgba(170,170,170,.08)',
       borderWidth: 2, borderDash: [6,4],
       pointRadius: d.cvr_ctrl_proj.map(v => v !== null ? 4 : 0),
       pointBackgroundColor: '#AAAAAA', pointStyle: 'rectRot',
-      fill: false, tension: 0, spanGaps: false,
+      fill: true, tension: 0, spanGaps: false,
       datalabels: { display: false }
     });
-    // Banda de lanzamiento como dataset de barra en W43/25
+  }
+
+  // Anotación de lanzamiento — solo semanal
+  if (isSemRet) {
     const launchIdx = d.labels.indexOf('W43/25');
     const launchData = new Array(d.labels.length).fill(null);
-    if (launchIdx >= 0) launchData[launchIdx] = 999; // valor alto → llena hasta el máximo del eje
+    if (launchIdx >= 0) launchData[launchIdx] = 999;
     cvrDatasets.push({
       label: '🚀 Lanzamiento 20 Oct',
       data: launchData,
@@ -1066,8 +1076,8 @@ function renderCharts() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: isSemRet, position: 'top', align: 'end',
-          labels: { boxWidth: 12, boxHeight: 12, filter: item => item.text !== 'Control' || !isSemRet } },
+        legend: { display: hasProj || isSemRet, position: 'top', align: 'end',
+          labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
         tooltip: { mode: 'index', intersect: false,
           callbacks: { label: ctx => ctx.raw !== null ? ` ${ctx.dataset.label}: ${ctx.raw}%` : null } },
         datalabels: !isRet ? {
