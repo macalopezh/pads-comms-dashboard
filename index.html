@@ -469,12 +469,11 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
           <button onclick="copyQuery('q1')" style="font-family:var(--font);font-size:12px;font-weight:600;padding:6px 14px;border:1px solid var(--border-primary);border-radius:var(--r-8);background:var(--bg-secondary);cursor:pointer;white-space:nowrap">Copiar SQL</button>
         </div>
         <pre id="q1" style="font-size:11px;line-height:1.6;background:var(--bg-secondary);border:1px solid var(--border-primary);border-radius:var(--r-12);padding:16px;overflow-x:auto;color:var(--text-primary);white-space:pre">WITH
--- Primer open por seller en el track de retención (push) — todos los sites
+-- Primera apertura por seller en cualquier comm del journey de retención
 first_open AS (
   SELECT N_cust_adv_id AS user_id, MIN(T_event_date) AS first_open_date
   FROM `meli-sbox.MADSCOREBI.TURING_SILVER_COMM_PERFO_OFF_SITE_RECURRING_DAILY`
   WHERE S_ambito = 'Retention' AND S_bu = 'MERCADO ADS' AND S_product = 'PADS'
-    AND S_communication_name LIKE '%_RET_JRN_REC_%'
     AND T_event_date >= '2025-08-01' AND N_open > 0
   GROUP BY 1
 ),
