@@ -667,19 +667,18 @@ const DATA = {
     // CVR: FRAME revenue>0 en 3d desde open_date de cualquier comm del journey (o trigger_date fallback)
     // Ventana de comparación: 28 días desde entrada (período con grupo de control limpio)
     // El grupo de control rota mensualmente — después del día 28 no es comparable
-    // † Sep-Oct 2025: track recién iniciado, n_ctrl muy bajo
-    // Actualizado: 13-Abr-2026 · CVR: open_date trigger · ventana control válida 28d
+    // Actualizado: 13-Abr-2026 · CVR: open_date de CUALQUIER comm del journey (sin filtro de nombre)
     // Rev incr = (avg_rev_trat - avg_rev_ctrl) × n_converted (FRAME rev>0 en 3d)
-    // ⚠️ Mar 2026: revenue negativo — avg_rev control > tratamiento (perfil de sellers diferente ese mes)
+    // ⚠️ Mar 2026: revenue negativo — avg_rev control > tratamiento (composición del cohort)
     labels: ['Sep 2025 †','Oct 2025 †','Nov 2025','Dic 2025','Ene 2026','Feb 2026','Mar 2026 ⚠️'],
-    cvr_treatment: [0.86,  1.52,  4.45, 21.06, 15.92, 13.52, 14.17],
-    cvr_control:   [0.00,  0.00,  0.05,  6.74,  6.34,  9.22, 13.07],
+    cvr_treatment: [0.88,  2.18, 31.77, 14.29, 14.54, 13.00, 13.56],
+    cvr_control:   [0.00,  0.08,  0.09,  6.74,  6.34,  9.22, 13.07],
     open_rate:     [ 9.1,  19.8,  33.0,  33.0,  37.7,  39.0,  37.2],
-    rev_incr_3d:   [   0,     0,     0,      0,      0,     0,     0],
-    rev_incr_30d:  [ 141,   455, 11495, 468485, 132876, 42914, -4080],
-    rev_incr_60d:  [ 281,  1183, 26752, 887295, 279262, 68648,-11915],
-    n_treatment:   [8966, 13965, 19643, 31769, 17111, 14978, 9509],
-    n_control:     [ 362,  1240,  2126,  4228,  2869,  2700, 1515],
+    rev_incr_3d:   [   0,     0,       0,      0,      0,     0,      0],
+    rev_incr_30d:  [ 293,  2691, 3097829,   9775,  86429, 35352,  -7052],
+    rev_incr_60d:  [ 893,  9568, 5258468,  28104, 184912, 54690, -14625],
+    n_treatment:   [15537, 17426, 33328, 24462, 15429, 14029, 9064],
+    n_control:     [  362,  1240,  2126,  4228,  2869,  2700, 1515],
   },
   semanal: {
     // Revenue semanal USD · todos los sites · W37/25–W09/26
@@ -716,17 +715,18 @@ const JOURNEY_DATA = {
 // Días 0-28: comparación válida con grupo de control (ctrl rota mensualmente → limpio ≤28d)
 // Días 35-63: solo CVR tratamiento — sin ctrl válido (el ctrl rotó y recibe comms)
 // ─────────────────────────────────────────
+// Actualizado: 13-Abr-2026 · sin filtro de nombre de comm (incluye TRS + REC)
 const TOUCHPOINT_DATA = [
-  { dia:  0, n_delivered: 25232, n_opened:  5606, open_rate: 22.2, cvr_trat: 24.67, cvr_ctrl:  7.16, uplift_pp: 17.50, uplift_rel: 244.3, ctrl_valido: true  },
-  { dia:  4, n_delivered: 28906, n_opened:  2729, open_rate:  9.4, cvr_trat: 15.03, cvr_ctrl:  9.46, uplift_pp:  5.57, uplift_rel:  58.9, ctrl_valido: true  },
-  { dia:  7, n_delivered: 34138, n_opened:  3959, open_rate: 11.6, cvr_trat: 12.02, cvr_ctrl: 10.67, uplift_pp:  1.35, uplift_rel:  12.7, ctrl_valido: true  },
-  { dia: 14, n_delivered: 33076, n_opened:  4802, open_rate: 14.5, cvr_trat:  8.76, cvr_ctrl: 13.32, uplift_pp: -4.56, uplift_rel: -34.2, ctrl_valido: true  },
-  { dia: 21, n_delivered: 30872, n_opened:  2847, open_rate:  9.2, cvr_trat:  7.10, cvr_ctrl: 15.06, uplift_pp: -7.97, uplift_rel: -52.9, ctrl_valido: true  },
-  { dia: 28, n_delivered:  5589, n_opened:   363, open_rate:  6.5, cvr_trat: 18.45, cvr_ctrl: 15.81, uplift_pp:  2.64, uplift_rel:  16.7, ctrl_valido: true  },
+  { dia:  0, n_delivered: 25233, n_opened:  5606, open_rate: 22.2, cvr_trat: 24.67, cvr_ctrl:  7.20, uplift_pp: 17.47, uplift_rel: 242.6, ctrl_valido: true  },
+  { dia:  4, n_delivered: 28906, n_opened:  2729, open_rate:  9.4, cvr_trat: 15.03, cvr_ctrl:  9.49, uplift_pp:  5.54, uplift_rel:  58.3, ctrl_valido: true  },
+  { dia:  7, n_delivered: 34138, n_opened:  3959, open_rate: 11.6, cvr_trat: 12.02, cvr_ctrl: 10.76, uplift_pp:  1.26, uplift_rel:  11.7, ctrl_valido: true  },
+  { dia: 14, n_delivered: 33077, n_opened:  4802, open_rate: 14.5, cvr_trat:  8.76, cvr_ctrl: 13.58, uplift_pp: -4.82, uplift_rel: -35.5, ctrl_valido: true  },
+  { dia: 21, n_delivered: 30872, n_opened:  2847, open_rate:  9.2, cvr_trat:  7.10, cvr_ctrl: 15.41, uplift_pp: -8.32, uplift_rel: -54.0, ctrl_valido: true  },
+  { dia: 28, n_delivered:  5589, n_opened:   363, open_rate:  6.5, cvr_trat: 18.45, cvr_ctrl: 16.33, uplift_pp:  2.11, uplift_rel:  12.9, ctrl_valido: true  },
   { dia: 35, n_delivered: 31659, n_opened:  1761, open_rate:  5.6, cvr_trat:  5.12, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
-  { dia: 49, n_delivered: 29937, n_opened:  2493, open_rate:  8.3, cvr_trat:  4.73, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
+  { dia: 49, n_delivered: 29939, n_opened:  2493, open_rate:  8.3, cvr_trat:  4.73, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
   { dia: 56, n_delivered: 29841, n_opened:  1603, open_rate:  5.4, cvr_trat:  4.33, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
-  { dia: 63, n_delivered: 29179, n_opened:  1726, open_rate:  5.9, cvr_trat:  2.58, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
+  { dia: 63, n_delivered: 29180, n_opened:  1726, open_rate:  5.9, cvr_trat:  2.58, cvr_ctrl: null,  uplift_pp: null,  uplift_rel: null,  ctrl_valido: false },
 ];
 
 // ─────────────────────────────────────────
