@@ -1014,53 +1014,73 @@ function renderCharts() {
   const gridColor = 'rgba(208,212,230,.5)';
 
   // CVR line chart
+  // Preparar datasets — para semanal de retención agregar ctrl proyectado + lanzamiento
+  const isSemRet = isRet && currentTab === 'semanal';
+  const cvrDatasets = [
+    {
+      label: 'Tratamiento',
+      data: d.cvr_treatment,
+      borderColor: '#434ce4', backgroundColor: 'rgba(67,76,228,.08)',
+      borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#434ce4',
+      fill: true, tension: .35, spanGaps: true,
+    },
+    {
+      label: 'Control',
+      data: d.cvr_control,
+      borderColor: '#b5b9d4', backgroundColor: 'rgba(181,185,212,.06)',
+      borderWidth: 2, borderDash: [5,4], pointRadius: d.cvr_control ? d.cvr_control.map(v => v !== null ? 3 : 0) : 3,
+      pointBackgroundColor: '#b5b9d4', fill: true, tension: .35, spanGaps: false,
+    }
+  ];
+  if (isSemRet && d.cvr_ctrl_proj) {
+    cvrDatasets.push({
+      label: 'Control proyectado (7.8%)',
+      data: d.cvr_ctrl_proj,
+      borderColor: '#AAAAAA', backgroundColor: 'transparent',
+      borderWidth: 2, borderDash: [6,4],
+      pointRadius: d.cvr_ctrl_proj.map(v => v !== null ? 4 : 0),
+      pointBackgroundColor: '#AAAAAA', pointStyle: 'rectRot',
+      fill: false, tension: 0, spanGaps: false,
+      datalabels: { display: false }
+    });
+    // Banda de lanzamiento como dataset de barra en W43/25
+    const launchIdx = d.labels.indexOf('W43/25');
+    const launchData = new Array(d.labels.length).fill(null);
+    if (launchIdx >= 0) launchData[launchIdx] = 999; // valor alto → llena hasta el máximo del eje
+    cvrDatasets.push({
+      label: '🚀 Lanzamiento 20 Oct',
+      data: launchData,
+      type: 'bar',
+      backgroundColor: 'rgba(255,230,0,0.18)',
+      borderColor: 'rgba(255,230,0,0.6)',
+      borderWidth: 1,
+      barPercentage: 0.5, categoryPercentage: 1,
+      order: 10,
+      datalabels: { display: false }
+    });
+  }
+
   charts.cvr = new Chart(document.getElementById('cvrChart'), {
     type: 'line',
-    data: {
-      labels: d.labels,
-      datasets: [
-        {
-          label: 'Tratamiento',
-          data: d.cvr_treatment,
-          borderColor: '#434ce4',
-          backgroundColor: 'rgba(67,76,228,.08)',
-          borderWidth: 2.5,
-          pointRadius: 4,
-          pointBackgroundColor: '#434ce4',
-          fill: true,
-          tension: .35,
-        },
-        {
-          label: 'Control',
-          data: d.cvr_control,
-          borderColor: '#b5b9d4',
-          backgroundColor: 'rgba(181,185,212,.06)',
-          borderWidth: 2,
-          borderDash: [5,4],
-          pointRadius: 3,
-          pointBackgroundColor: '#b5b9d4',
-          fill: true,
-          tension: .35,
-        }
-      ]
-    },
+    data: { labels: d.labels, datasets: cvrDatasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
-        tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } },
+        legend: { display: isSemRet, position: 'top', align: 'end',
+          labels: { boxWidth: 12, boxHeight: 12, filter: item => item.text !== 'Control' || !isSemRet } },
+        tooltip: { mode: 'index', intersect: false,
+          callbacks: { label: ctx => ctx.raw !== null ? ` ${ctx.dataset.label}: ${ctx.raw}%` : null } },
         datalabels: !isRet ? {
-          display: ctx => ctx.datasetIndex === 0,  // solo tratamiento
+          display: ctx => ctx.datasetIndex === 0,
           align: 'top', anchor: 'end',
           formatter: v => v + '%',
-          font: { size: 10, weight: 700 },
-          color: '#1C1C28',
-          padding: 3
+          font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 3
         } : false
       },
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 0 } },
-        y: { grid: { color: gridColor }, ticks: { callback: v => v+'%' }, beginAtZero: true }
+        y: { grid: { color: gridColor }, ticks: { callback: v => v+'%' }, beginAtZero: true,
+             max: isSemRet ? undefined : undefined }
       }
     }
   });
@@ -1676,61 +1696,10 @@ function updateCharts() {
   const revKey = `rev_incr_${revenueWindow}d`;
   const revData = d[revKey] || d.rev_incr_60d;
 
-  charts.cvr.data.labels = d.labels;
-  charts.cvr.data.datasets[0].data = d.cvr_treatment;
-  charts.cvr.data.datasets[1].data = d.cvr_control;
-  charts.cvr.options.scales.y.min = isRet ? undefined : 0;
-
-  // Semanal de retención: agregar control proyectado + anotación de lanzamiento
-  if (isRet && currentTab === 'semanal' && d.cvr_ctrl_proj) {
-    // Dataset control proyectado (si no existe, lo agrega)
-    if (charts.cvr.data.datasets.length < 3) {
-      charts.cvr.data.datasets.push({
-        label: 'CVR Control (proyectado)',
-        data: d.cvr_ctrl_proj,
-        borderColor: '#AAAAAA',
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderDash: [6, 4],
-        pointRadius: 3,
-        pointBackgroundColor: '#AAAAAA',
-        fill: false,
-        tension: 0,
-        datalabels: { display: false }
-      });
-    } else {
-      charts.cvr.data.datasets[2].data = d.cvr_ctrl_proj;
-    }
-    // Anotación de lanzamiento como línea vertical pseudo-dataset
-    const launchIdx = d.labels.indexOf('W43/25');
-    if (launchIdx >= 0 && charts.cvr.data.datasets.length < 4) {
-      const launchLine = new Array(d.labels.length).fill(null);
-      launchLine[launchIdx] = 0;
-      charts.cvr.data.datasets.push({
-        label: '🚀 Lanzamiento 20 Oct',
-        data: launchLine,
-        type: 'bar',
-        backgroundColor: 'rgba(255,230,0,0.25)',
-        borderColor: '#FFE600',
-        borderWidth: 2,
-        borderSkipped: false,
-        barPercentage: 0.15,
-        categoryPercentage: 1,
-        order: 10,
-        datalabels: { display: false }
-      });
-    }
-  } else if (charts.cvr.data.datasets.length > 2) {
-    // Limpiar datasets extra al cambiar a mensual o adquisición
-    charts.cvr.data.datasets.splice(2);
-  }
-
-  charts.cvr.update();
-
-  charts.revenue.data.labels = d.labels;
-  charts.revenue.data.datasets[0].data = revData;
-  charts.revenue.data.datasets[0].backgroundColor = revData.map(v => v < 0 ? 'rgba(158,0,21,.7)' : 'rgba(67,76,228,.75)');
-  charts.revenue.update();
+  // Destruir y recrear siempre — garantiza datasets correctos (proyección, anotación, etc.)
+  Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+  charts = {};
+  renderCharts();
 
   const sub = document.getElementById('revSubtitle');
   if (sub) sub.textContent = `Ventana ${revenueWindow}d post-trigger vs grupo control`;
