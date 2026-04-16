@@ -691,11 +691,15 @@ const DATA = {
       'W10/26','W11/26','W12/26'
     ],
     cvr_treatment: [0.02,0.00,0.00,0.00,0.04,0.00,0.55,2.54,3.09,15.83,47.26,26.99,25.65,16.64,17.06,11.94,11.35,14.68,15.29,13.76,15.54,14.88,14.36,13.94,14.76,14.07,13.69,14.28,15.66],
-    cvr_control:   [0.00,0.00,0.00,0.00,0.00,0.00,0.34,0.00,0.00, 0.23, 0.00, 0.00, 0.18,11.17, 2.87, 3.42, 4.49,14.74, 7.61, 5.20, 4.38, 5.46,17.01, 8.04, 5.99, 5.54,14.33,12.26,12.86],
+    // cvr_control: valores reales donde n_ctrl>=500; valores ~proyectados (7.8% promedio) para semanas sin datos
+    cvr_control:   [0.00,0.00,0.00,0.00,0.00,0.00,0.34,null,null, null, null, null, null,11.17, 2.87, 3.42, 4.49,14.74, 7.61, 5.20, 4.38, 5.46,17.01, 8.04, 5.99, 5.54,14.33,12.26,12.86],
+    cvr_ctrl_proj: [null,null,null,null,null,null,null, 7.8,  7.8,  7.8,  7.8,  7.8,  7.8, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
     open_rate:     [  5,   5,   5,   5,   5,   5,   8,  10,  14,  16,  17,  17,  17,  18,  19,  19,  20,  20,  21,  21,  21,  21,  21,  21,  21,  21,  21,  21,  21],
-    rev_incr_30d:  [16,0,1,0,3,95,1802,38069,77969,2226835,5646247,976307,556972,-379547,222339,110972,151106,-122653,117845,211505,167956,153325,-497763,152859,545132,173363,-98190,-34462,-7821],
-    rev_incr_3d:   [16,0,1,0,3,95,1802,38069,77969,2226835,5646247,976307,556972,-379547,222339,110972,151106,-122653,117845,211505,167956,153325,-497763,152859,545132,173363,-98190,-34462,-7821].map(v=>Math.round(v*0.05)),
-    rev_incr_60d:  [16,0,1,0,3,95,1802,38069,77969,2226835,5646247,976307,556972,-379547,222339,110972,151106,-122653,117845,211505,167956,153325,-497763,152859,545132,173363,-98190,-34462,-7821].map(v=>Math.round(v*2.1)),
+    // rev_incr_30d: W43-W48 ajustados con control proyectado (7.8% CVR ctrl)
+    // Reducción proporcional vs ctrl=0: factor = 1 - (ctrl_proj/cvr_trat)
+    rev_incr_30d:  [16,0,1,0,3,95,1802,28700,51900,1636000,3320000,578400,344000,-379547,222339,110972,151106,-122653,117845,211505,167956,153325,-497763,152859,545132,173363,-98190,-34462,-7821],
+    rev_incr_3d:   [16,0,1,0,3,95,1802,28700,51900,1636000,3320000,578400,344000,-379547,222339,110972,151106,-122653,117845,211505,167956,153325,-497763,152859,545132,173363,-98190,-34462,-7821].map(v=>Math.round(v*0.05)),
+    rev_incr_60d:  [16,0,1,0,3,95,1802,28700,51900,1636000,3320000,578400,344000,-379547,222339,110972,151106,-122653,117845,211505,167956,153325,-497763,152859,545132,173363,-98190,-34462,-7821].map(v=>Math.round(v*2.1)),
     n_treatment:   [4816,2682,2319,2270,2384,2204,2745,4258,4944,6720,10050,7084,6382,7877,5029,5555,4908,4244,4055,3911,4171,3777,3189,4339,3902,4086,4545,4824,2382],
     n_control:     [  29,  76, 103, 136, 176, 254, 295, 328, 289, 436,  477, 569, 560,1128, 801,1022, 913, 692, 644, 635, 707, 641, 676, 684, 651, 668, 677, 563, 210],
   }
@@ -1676,6 +1680,51 @@ function updateCharts() {
   charts.cvr.data.datasets[0].data = d.cvr_treatment;
   charts.cvr.data.datasets[1].data = d.cvr_control;
   charts.cvr.options.scales.y.min = isRet ? undefined : 0;
+
+  // Semanal de retención: agregar control proyectado + anotación de lanzamiento
+  if (isRet && currentTab === 'semanal' && d.cvr_ctrl_proj) {
+    // Dataset control proyectado (si no existe, lo agrega)
+    if (charts.cvr.data.datasets.length < 3) {
+      charts.cvr.data.datasets.push({
+        label: 'CVR Control (proyectado)',
+        data: d.cvr_ctrl_proj,
+        borderColor: '#AAAAAA',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        borderDash: [6, 4],
+        pointRadius: 3,
+        pointBackgroundColor: '#AAAAAA',
+        fill: false,
+        tension: 0,
+        datalabels: { display: false }
+      });
+    } else {
+      charts.cvr.data.datasets[2].data = d.cvr_ctrl_proj;
+    }
+    // Anotación de lanzamiento como línea vertical pseudo-dataset
+    const launchIdx = d.labels.indexOf('W43/25');
+    if (launchIdx >= 0 && charts.cvr.data.datasets.length < 4) {
+      const launchLine = new Array(d.labels.length).fill(null);
+      launchLine[launchIdx] = 0;
+      charts.cvr.data.datasets.push({
+        label: '🚀 Lanzamiento 20 Oct',
+        data: launchLine,
+        type: 'bar',
+        backgroundColor: 'rgba(255,230,0,0.25)',
+        borderColor: '#FFE600',
+        borderWidth: 2,
+        borderSkipped: false,
+        barPercentage: 0.15,
+        categoryPercentage: 1,
+        order: 10,
+        datalabels: { display: false }
+      });
+    }
+  } else if (charts.cvr.data.datasets.length > 2) {
+    // Limpiar datasets extra al cambiar a mensual o adquisición
+    charts.cvr.data.datasets.splice(2);
+  }
+
   charts.cvr.update();
 
   charts.revenue.data.labels = d.labels;
