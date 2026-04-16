@@ -1041,14 +1041,26 @@ function renderCharts() {
   // Dataset proyectado — aplica a semanal Y mensual de retención
   if (hasProj) {
     cvrDatasets.push({
-      label: 'Control proyectado (~7%)',
+      label: 'Control proyectado',
       data: d.cvr_ctrl_proj,
-      borderColor: '#AAAAAA', backgroundColor: 'rgba(170,170,170,.08)',
-      borderWidth: 2, borderDash: [6,4],
-      pointRadius: d.cvr_ctrl_proj.map(v => v !== null ? 4 : 0),
-      pointBackgroundColor: '#AAAAAA', pointStyle: 'rectRot',
-      fill: true, tension: 0, spanGaps: false,
-      datalabels: { display: false }
+      borderColor: '#E63946',
+      backgroundColor: 'rgba(230,57,70,.08)',
+      borderWidth: 2.5,
+      borderDash: [8, 4],
+      pointRadius: d.cvr_ctrl_proj.map(v => v !== null ? 6 : 0),
+      pointBackgroundColor: '#E63946',
+      pointStyle: 'triangle',
+      fill: true,
+      tension: 0,
+      spanGaps: false,
+      datalabels: {
+        display: ctx => d.cvr_ctrl_proj[ctx.dataIndex] !== null,
+        align: 'bottom', anchor: 'end',
+        formatter: v => '~' + v + '%',
+        font: { size: 10, weight: 700 },
+        color: '#E63946',
+        padding: 3
+      }
     });
   }
 
