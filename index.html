@@ -1075,13 +1075,13 @@ function renderCharts() {
           const v = ctx.raw, abs = Math.abs(v), sign = v < 0 ? '-' : '';
           return ` ${sign}${abs >= 1e6 ? '$'+(abs/1e6).toFixed(2)+'M' : abs >= 1e3 ? '$'+(abs/1e3).toFixed(1)+'K' : '$'+abs} USD`;
         }}},
-        datalabels: !isRet ? {
+        datalabels: {
           display: ctx => ctx.raw !== 0,
           anchor: ctx => ctx.raw < 0 ? 'start' : 'end',
           align: ctx => ctx.raw < 0 ? 'bottom' : 'top',
           formatter: v => { const abs = Math.abs(v); return (v<0?'-':'')+(abs>=1e6?'$'+(abs/1e6).toFixed(1)+'M':abs>=1e3?'$'+(abs/1e3).toFixed(0)+'K':'$'+abs); },
           font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 3
-        } : false
+        }
       },
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 0 } },
