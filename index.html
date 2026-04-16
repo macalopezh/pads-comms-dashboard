@@ -663,15 +663,18 @@ const DATA = {
     // Ventana de comparación: 28 días desde entrada (período con grupo de control limpio)
     // El grupo de control rota mensualmente — después del día 28 no es comparable
     // † Sep-Oct 2025: track recién iniciado, n_ctrl muy bajo
-    labels: ['Sep 2025 †','Oct 2025 †','Nov 2025','Dic 2025','Ene 2026','Feb 2026','Mar 2026'],
-    cvr_treatment: [0.00,  0.00,  6.48, 41.87, 32.83, 29.45, 33.50],
-    cvr_control:   [0.00,  0.00,  0.09, 18.80, 16.59, 24.11, 35.91],
-    open_rate:     [9.1, 19.8,  33.0,  33.0,  37.7,  39.0,  37.2],
-    rev_incr_3d:   [   16,    252, 1234692,  -16805,   16561,    0,    0],
-    rev_incr_30d:  [   17,  69557, 9777696,  101335,  466874,    0,    0],
-    rev_incr_60d:  [22061, 363954,16530588,  231153,  967117,    0,    0],
-    n_treatment:   [9298, 14736, 21612, 47449, 22756, 19589, 8576],
-    n_control:     [ 362,  1240,  2127,  4856,  3219,  3218, 1281],
+    // Actualizado: 13-Abr-2026 · CVR: open_date trigger · ventana control válida 28d
+    // Rev incr = (avg_rev_trat - avg_rev_ctrl) × n_converted (FRAME rev>0 en 3d)
+    // ⚠️ Mar 2026: revenue negativo — avg_rev control > tratamiento (perfil de sellers diferente ese mes)
+    labels: ['Sep 2025 †','Oct 2025 †','Nov 2025','Dic 2025','Ene 2026','Feb 2026','Mar 2026 ⚠️'],
+    cvr_treatment: [0.86,  1.52,  4.45, 21.06, 15.92, 13.52, 14.17],
+    cvr_control:   [0.00,  0.00,  0.05,  6.74,  6.34,  9.22, 13.07],
+    open_rate:     [ 9.1,  19.8,  33.0,  33.0,  37.7,  39.0,  37.2],
+    rev_incr_3d:   [   0,     0,     0,      0,      0,     0,     0],
+    rev_incr_30d:  [ 141,   455, 11495, 468485, 132876, 42914, -4080],
+    rev_incr_60d:  [ 281,  1183, 26752, 887295, 279262, 68648,-11915],
+    n_treatment:   [8966, 13965, 19643, 31769, 17111, 14978, 9509],
+    n_control:     [ 362,  1240,  2126,  4228,  2869,  2700, 1515],
   },
   semanal: {
     // Revenue semanal USD · todos los sites · W37/25–W09/26
@@ -872,7 +875,7 @@ function updateDashboard() {
   document.getElementById('breakdownTitle').textContent = isRet ? 'Detalle por Journey Cause' : 'Detalle por Sub_scope';
 
   document.getElementById('dataNotes').innerHTML = isRet
-    ? '<strong>Notas sobre los datos:</strong> &nbsp;† Sep–Oct 2025: comms sin volumen significativo (CVR &lt; 1%) — track recién iniciado. &nbsp;Revenue en USD (REVS_TOTAL_USD) — comparable entre todos los sites. &nbsp;Rev 3d negativo en Dic refleja estacionalidad; 30d y 60d son positivos. &nbsp;Meses más confiables: <strong>Nov 2025 – Ene 2026</strong>.'
+    ? '<strong>Notas metodológicas:</strong> &nbsp;† Sep–Oct 2025: n_ctrl muy bajo, no confiables. &nbsp;<strong>CVR</strong>: FRAME rev &gt; 0 en 3d desde open_date (fallback trigger_date) · ventana de control válida = 28 días (ctrl rota ~78% al mes siguiente). &nbsp;<strong>Revenue incr</strong>: (avg_trat − avg_ctrl) × n_converted (FRAME). &nbsp;⚠️ Mar 2026: revenue negativo — avg_rev control &gt; tratamiento ese mes (perfil de sellers diferente). &nbsp;Meses confiables: <strong>Dic 2025 – Feb 2026</strong>.'
     : '<strong>Notas metodológicas:</strong> &nbsp;* Dic 2025: backlog histórico — n_trat ~8x mayor. &nbsp;† Abr 2026: mes en curso, sin ventana 30d/60d completa. &nbsp;<strong>CVR</strong>: FRAME revenue &gt; 0 en 3d desde open_date (fallback sent_date) — misma metodología ambos grupos. &nbsp;<strong>Revenue incremental</strong>: (avg_rev_trat − avg_rev_ctrl) × <strong>n_converted</strong> (FRAME rev&gt;0 en 3d). &nbsp;<strong>Embudo</strong>: n_converted (FRAME) ≥ n_last_click (GOLD) — ambos en ventana 3d desde open.';
 
   // Inyectar / limpiar toggles de queries en los chart cards
@@ -935,7 +938,7 @@ function renderKPIs() {
   };
 
   // Referencia: Ene 2026 para retención (idx 4 mensual), Ene 2026 para adquisición (idx 1)
-  const refIdx = isRet ? (currentTab === 'mensual' ? 6 : Math.floor(d.labels.length * 0.6)) : 2; // retención: Mar 2026 (idx 6) · adq: Feb 2026 (idx 2)
+  const refIdx = isRet ? (currentTab === 'mensual' ? 5 : Math.floor(d.labels.length * 0.6)) : 2; // retención: Feb 2026 (idx 5, Mar tiene rev neg) · adq: Feb 2026 (idx 2)
   const cvr_t_ref = d.cvr_treatment[refIdx];
   const cvr_c_ref = d.cvr_control[refIdx];
   const uplift_pp_ref  = (cvr_t_ref - cvr_c_ref).toFixed(2);
@@ -947,12 +950,12 @@ function renderKPIs() {
   const ratioNote = isRet
     ? 'El seller genera el doble entre d31–d60'
     : 'Adquisición convierte más rápido que retención';
-  const periodNote = isRet ? 'Sep 2025 – Mar 2026' : 'Dic 2025 – Abr 2026';
+  const periodNote = isRet ? 'Sep 2025 – Feb 2026' : 'Dic 2025 – Abr 2026';
   const usersNote = isRet ? 'Todos los sites · desde Sep 2025' : 'Todos los sites · control ~5%';
 
   document.getElementById('kpiGrid').innerHTML = `
     <div class="kpi-card positive">
-      <div class="kpi-label">CVR Uplift · ${isRet ? 'Mar 2026' : 'Feb 2026'}</div>
+      <div class="kpi-label">CVR Uplift · ${isRet ? 'Feb 2026' : 'Feb 2026'}</div>
       <div class="kpi-value">+${uplift_pp_ref}pp</div>
       <span class="kpi-delta up">▲ ${uplift_rel_ref}% relativo</span>
       <div class="kpi-sub">${cvr_t_ref}% trat. vs ${cvr_c_ref}% ctrl</div>
@@ -964,7 +967,7 @@ function renderKPIs() {
       <div class="kpi-sub">USD · ${revenueWindow}d post-trigger vs control</div>
     </div>
     <div class="kpi-card positive">
-      <div class="kpi-label">Ratio Revenue 60d / 30d · ${isRet ? 'Mar 2026' : 'Feb 2026'}</div>
+      <div class="kpi-label">Ratio Revenue 60d / 30d · ${isRet ? 'Feb 2026' : 'Feb 2026'}</div>
       <div class="kpi-value">${ratioRef}</div>
       <span class="kpi-delta up">▲ 60d recomendado</span>
       <div class="kpi-sub">${ratioNote}</div>
