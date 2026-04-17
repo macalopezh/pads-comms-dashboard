@@ -1999,43 +1999,25 @@ function renderTgmvAdvChart() {
           data: d.pct_tgmv_adv,
           borderColor: '#1C1C28',
           backgroundColor: 'rgba(28,28,40,.05)',
-          borderWidth: 2.5,
-          pointRadius: 4, pointBackgroundColor: '#1C1C28',
-          fill: true, tension: .3, yAxisID: 'yLeft',
-          datalabels: {
-            display: true, align: 'top', anchor: 'end',
-            formatter: v => v + '%', font: { size: 10, weight: 700 },
-            color: '#1C1C28', padding: 2
-          }
+          borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#1C1C28',
+          fill: true, tension: .3, yAxisID: 'y1',
         },
         {
-          label: 'Contribución FRAME (stock acum.)',
+          label: 'Contribución FRAME conv (stock acum.)',
           data: d.pct_tgmv_frame,
           borderColor: '#00A650',
           backgroundColor: 'rgba(0,166,80,.15)',
-          borderWidth: 2.5,
-          pointRadius: 5, pointBackgroundColor: '#00A650',
-          fill: true, tension: .3, yAxisID: 'yRight',
-          datalabels: {
-            display: true, align: 'top', anchor: 'end',
-            formatter: v => v + '%', font: { size: 10, weight: 700 },
-            color: '#00A650', padding: 2
-          }
+          borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#00A650',
+          fill: true, tension: .3, yAxisID: 'y2',
         },
         {
           label: 'Contribución Last-click GOLD (stock acum.)',
           data: d.pct_tgmv_last_click,
           borderColor: '#434ce4',
           backgroundColor: 'rgba(67,76,228,.08)',
-          borderWidth: 2,
-          borderDash: [5, 4],
+          borderWidth: 2, borderDash: [5,4],
           pointRadius: 4, pointBackgroundColor: '#434ce4',
-          fill: true, tension: .3, yAxisID: 'yRight',
-          datalabels: {
-            display: true, align: 'bottom', anchor: 'end',
-            formatter: v => v + '%', font: { size: 10, weight: 700 },
-            color: '#434ce4', padding: 2
-          }
+          fill: false, tension: .3, yAxisID: 'y2',
         }
       ]
     },
@@ -2044,28 +2026,32 @@ function renderTgmvAdvChart() {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%`
-          }
-        },
-        datalabels: {}
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } },
+        datalabels: {
+          display: ctx => ctx.datasetIndex < 3,
+          align: ctx => ctx.datasetIndex === 0 ? 'top' : (ctx.datasetIndex === 1 ? 'top' : 'bottom'),
+          anchor: 'end',
+          formatter: v => v + '%',
+          font: { size: 10, weight: 700 },
+          color: ctx => ['#1C1C28','#00A650','#434ce4'][ctx.datasetIndex],
+          padding: 3
+        }
       },
       scales: {
         x: { grid: { display: false } },
-        yLeft: {
+        y1: {
           type: 'linear', position: 'left',
           grid: { color: gridColor },
           ticks: { callback: v => v + '%' },
-          min: 70, max: 80,
-          title: { display: true, text: '% TGMV Advertiser total', font: { size: 11 } }
+          min: 73, max: 79,
+          title: { display: true, text: '% TGMV Advertiser', color: '#444', font: { size: 11 } }
         },
-        yRight: {
+        y2: {
           type: 'linear', position: 'right',
           grid: { drawOnChartArea: false },
           ticks: { callback: v => v + '%' },
           min: 0, max: 0.7,
-          title: { display: true, text: '% TGMV de comms', font: { size: 11 } }
+          title: { display: true, text: '% TGMV comms', color: '#444', font: { size: 11 } }
         }
       }
     }
