@@ -361,6 +361,11 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
       <div class="chart-subtitle" id="revSubtitle">Ventana 60d post-trigger vs grupo control · cambiá la ventana arriba</div>
       <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
     </div>
+    <div class="chart-card" id="ratioCard" style="display:none">
+      <div class="chart-title">Ratio de Penetración REVS/TGMV</div>
+      <div class="chart-subtitle" id="ratioSubtitle">Trat vs Control · ventana 30d</div>
+      <div class="chart-wrap"><canvas id="ratioChart"></canvas></div>
+    </div>
     <div class="chart-card full">
       <div class="chart-title" id="upliftChartTitle">CVR Uplift Relativo % — por Journey Cause</div>
       <div class="chart-subtitle" id="upliftChartSubtitle">Uplift porcentual de conversión por causa de ingreso al track · acumulado</div>
@@ -805,6 +810,11 @@ const DATA_ADQ = {
     n_control:     [ 22586, 23589, 23526, 27122, 25312],
     n_converted:   [ 7860,  3329,  3209,  1855,   533],
     n_last_click:  [ 3775,   676,  1084,   929,   185],
+    // Ratio de penetración REVS/TGMV (%) en ventana 30d y 60d desde open_date
+    ratio_trat_30d: [1.188, 1.496, 2.431, 2.538, null],
+    ratio_ctrl_30d: [0.602, 0.615, 0.985, 0.609, null],
+    ratio_trat_60d: [1.394, 1.706, 2.861, 2.552, null],
+    ratio_ctrl_60d: [0.959, 1.152, 1.070, 0.868, null],
   }
 };
 // Acumulado Dic 2025 – Mar 2026 por sub_scope (opción B: mismo universo partida)
@@ -927,6 +937,7 @@ function updateDashboard() {
   // Mostrar/ocultar embudo de atribución
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
   document.getElementById('tgmvDeltaCard').style.display = isRet ? 'none' : '';
+  document.getElementById('ratioCard').style.display = isRet ? 'none' : '';
   document.getElementById('tgmvAdvCard').style.display = isRet ? 'none' : '';
   document.getElementById('subscopeMesSection').style.display = isRet ? 'none' : '';
   document.getElementById('touchpointSection').style.display = isRet ? 'block' : 'none';
@@ -1356,9 +1367,10 @@ function renderCharts() {
     });
   }
 
-  // TGMV Advertiser charts — solo adquisición, defer para que el DOM tenga dimensiones
+  // Charts adicionales de adquisición — defer para que el DOM tenga dimensiones
   if (!isRet) {
     requestAnimationFrame(() => {
+      renderRatioChart();
       renderTgmvAdvChart();
       renderTgmvDeltaChart();
     });
@@ -1767,6 +1779,8 @@ function updateCharts() {
 
   const sub = document.getElementById('revSubtitle');
   if (sub) sub.textContent = `Ventana ${revenueWindow}d post-trigger vs grupo control`;
+  // Actualizar ratio chart cuando cambia ventana
+  if (!isRet && charts.ratio) { charts.ratio.destroy(); delete charts.ratio; renderRatioChart(); }
 }
 
 // ─────────────────────────────────────────
@@ -1998,6 +2012,77 @@ function renderSegundaMitadChart() {
 // ─────────────────────────────────────────
 // ADQUISICIÓN — Gráfico %TGMV Advertiser
 // ─────────────────────────────────────────
+function renderRatioChart() {
+  const el = document.getElementById('ratioChart');
+  if (!el) return;
+  if (charts.ratio) { charts.ratio.destroy(); delete charts.ratio; }
+  const d = DATA_ADQ['mensual'];
+  const gridColor = 'rgba(228,232,240,.5)';
+  const revKey = `ratio_trat_${revenueWindow}d`;
+  const ctrlKey = `ratio_ctrl_${revenueWindow}d`;
+  const ratioTrat = d[revKey] || d.ratio_trat_30d;
+  const ratioCtrl = d[ctrlKey] || d.ratio_ctrl_30d;
+
+  // Actualizar subtítulo
+  const sub = document.getElementById('ratioSubtitle');
+  if (sub) sub.textContent = `Trat vs Control · ventana ${revenueWindow}d desde apertura`;
+
+  charts.ratio = new Chart(el, {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [
+        {
+          label: 'Tratamiento',
+          data: ratioTrat,
+          borderColor: '#434ce4', backgroundColor: 'rgba(67,76,228,.08)',
+          borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#434ce4',
+          fill: true, tension: .35, spanGaps: false,
+          datalabels: {
+            display: ctx => ratioTrat[ctx.dataIndex] !== null,
+            align: 'top', anchor: 'end',
+            formatter: v => v + '%', font: { size: 10, weight: 700 }, color: '#434ce4', padding: 2
+          }
+        },
+        {
+          label: 'Control',
+          data: ratioCtrl,
+          borderColor: '#b5b9d4', backgroundColor: 'rgba(181,185,212,.06)',
+          borderWidth: 2, borderDash: [5,4], pointRadius: 3, pointBackgroundColor: '#b5b9d4',
+          fill: true, tension: .35, spanGaps: false,
+          datalabels: {
+            display: ctx => ratioCtrl[ctx.dataIndex] !== null,
+            align: 'bottom', anchor: 'end',
+            formatter: v => v + '%', font: { size: 10, weight: 600 }, color: '#888888', padding: 2
+          }
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false,
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%`,
+            afterBody: items => {
+              const i = items[0].dataIndex;
+              const t = ratioTrat[i], c = ratioCtrl[i];
+              if (t && c) return [`Δ: +${Math.round((t-c)*1000)/1000}pp`];
+              return [];
+            }
+          }
+        },
+        datalabels: {}
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 0 } },
+        y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
 function renderTgmvAdvChart() {
   const el = document.getElementById('tgmvAdvChart');
   if (!el) return;
