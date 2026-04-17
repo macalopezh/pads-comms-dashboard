@@ -775,12 +775,12 @@ const SEGUNDA_MITAD_DATA = [
 // pct_tgmv_last_click: TGMV de sellers last-click (GOLD) / TGMV total
 // pct_tgmv_frame: TGMV de sellers convertidos FRAME 3d / TGMV total
 // ─────────────────────────────────────────
-// Stock acumulado: para cada mes M, TGMV de sellers activados en ≤ M que siguen publicitando
+// Stock acumulado last-click (GOLD) · base Dic 2025 para calcular delta Ene
+// Metodología: sellers con N_conversion=1 en GOLD · TGMV de esos sellers en cada mes
 const TGMV_ADV_DATA = {
-  labels: ['Ene 2026', 'Feb 2026', 'Mar 2026', 'Abr 2026 †'],
-  pct_tgmv_adv:        [75.43, 76.14, 76.40, 76.24],   // %TGMV Advertiser total del mercado
-  pct_tgmv_last_click: [0.029, 0.089, 0.153, 0.205],   // GOLD N_conversion=1 (stock acum.)
-  pct_tgmv_frame:      [0.201, 0.406, 0.515, 0.559],   // FRAME conv 3d (stock acum.)
+  labels: ['Dic 2025 *', 'Ene 2026', 'Feb 2026', 'Mar 2026', 'Abr 2026 †'],
+  pct_tgmv_adv:        [76.56, 75.43, 76.14, 76.40, 76.24],
+  pct_tgmv_last_click: [0.050, 0.083, 0.143, 0.207, 0.258],
 };
 
 // ─────────────────────────────────────────
@@ -2017,23 +2017,22 @@ function renderTgmvAdvChart() {
           backgroundColor: 'rgba(28,28,40,.05)',
           borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#1C1C28',
           fill: true, tension: .3, yAxisID: 'y1',
+          datalabels: {
+            display: true, align: 'top', anchor: 'end',
+            formatter: v => v + '%', font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 3
+          }
         },
         {
-          label: 'Contribución FRAME conv (stock acum.)',
-          data: d.pct_tgmv_frame,
-          borderColor: '#00A650',
-          backgroundColor: 'rgba(0,166,80,.15)',
-          borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#00A650',
-          fill: true, tension: .3, yAxisID: 'y2',
-        },
-        {
-          label: 'Contribución Last-click GOLD (stock acum.)',
+          label: '%TGMV de comms (GOLD last-click · stock acum.)',
           data: d.pct_tgmv_last_click,
           borderColor: '#434ce4',
-          backgroundColor: 'rgba(67,76,228,.08)',
-          borderWidth: 2, borderDash: [5,4],
-          pointRadius: 4, pointBackgroundColor: '#434ce4',
-          fill: false, tension: .3, yAxisID: 'y2',
+          backgroundColor: 'rgba(67,76,228,.15)',
+          borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#434ce4',
+          fill: true, tension: .3, yAxisID: 'y2',
+          datalabels: {
+            display: true, align: 'top', anchor: 'end',
+            formatter: v => v + '%', font: { size: 10, weight: 700 }, color: '#434ce4', padding: 3
+          }
         }
       ]
     },
@@ -2043,31 +2042,19 @@ function renderTgmvAdvChart() {
       plugins: {
         legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
         tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } },
-        datalabels: {
-          display: ctx => ctx.datasetIndex < 3,
-          align: ctx => ctx.datasetIndex === 0 ? 'top' : (ctx.datasetIndex === 1 ? 'top' : 'bottom'),
-          anchor: 'end',
-          formatter: v => v + '%',
-          font: { size: 10, weight: 700 },
-          color: ctx => ['#1C1C28','#00A650','#434ce4'][ctx.datasetIndex],
-          padding: 3
-        }
+        datalabels: {}
       },
       scales: {
         x: { grid: { display: false } },
         y1: {
-          type: 'linear', position: 'left',
-          grid: { color: gridColor },
-          ticks: { callback: v => v + '%' },
-          min: 73, max: 79,
-          title: { display: true, text: '% TGMV Advertiser', color: '#444', font: { size: 11 } }
+          type: 'linear', position: 'left', grid: { color: gridColor },
+          ticks: { callback: v => v + '%' }, min: 73, max: 79,
+          title: { display: true, text: '% TGMV Advertiser total', color: '#444', font: { size: 11 } }
         },
         y2: {
-          type: 'linear', position: 'right',
-          grid: { drawOnChartArea: false },
-          ticks: { callback: v => v + '%' },
-          min: 0, max: 0.7,
-          title: { display: true, text: '% TGMV comms', color: '#444', font: { size: 11 } }
+          type: 'linear', position: 'right', grid: { drawOnChartArea: false },
+          ticks: { callback: v => v + '%' }, min: 0, max: 0.35,
+          title: { display: true, text: '% TGMV de comms', color: '#434ce4', font: { size: 11 } }
         }
       }
     }
@@ -2081,17 +2068,15 @@ function renderTgmvDeltaChart() {
   const gridColor = 'rgba(228,232,240,.5)';
   const d = TGMV_ADV_DATA;
 
-  // Calcular deltas MoM
-  const labels = d.labels.slice(1); // Feb, Mar, Abr (primer mes no tiene delta)
-  const deltaTotal = [], deltaFrame = [], deltaGold = [], resto = [];
+  // Calcular deltas MoM — desde Ene (Dic como base)
+  const labels = d.labels.slice(1); // Ene, Feb, Mar, Abr
+  const deltaTotal = [], deltaGold = [], resto = [];
   for (let i = 1; i < d.labels.length; i++) {
     const dt = Math.round((d.pct_tgmv_adv[i] - d.pct_tgmv_adv[i-1]) * 100) / 100;
-    const df = Math.round((d.pct_tgmv_frame[i] - d.pct_tgmv_frame[i-1]) * 1000) / 1000;
     const dg = Math.round((d.pct_tgmv_last_click[i] - d.pct_tgmv_last_click[i-1]) * 1000) / 1000;
     deltaTotal.push(dt);
-    deltaFrame.push(df);
     deltaGold.push(dg);
-    resto.push(Math.round((dt - df) * 1000) / 1000); // variación no atribuida a comms
+    resto.push(Math.round((dt - dg) * 1000) / 1000);
   }
 
   charts.tgmvDelta = new Chart(el, {
@@ -2110,22 +2095,9 @@ function renderTgmvDeltaChart() {
           datalabels: { display: false }
         },
         {
-          label: 'Contribución FRAME conv (stock acum.)',
-          data: deltaFrame,
-          backgroundColor: 'rgba(0,166,80,.7)',
-          borderColor: '#00A650', borderWidth: 1.5,
-          borderRadius: 4, stack: 'delta',
-          datalabels: {
-            display: ctx => Math.abs(ctx.raw) > 0.001,
-            formatter: v => (v > 0 ? '+' : '') + v + 'pp',
-            font: { size: 9, weight: 700 }, color: '#FFFFFF',
-            anchor: 'center', align: 'center'
-          }
-        },
-        {
-          label: 'Contribución Last-click GOLD (stock acum.)',
+          label: 'Contribución GOLD last-click (stock acum.)',
           data: deltaGold,
-          backgroundColor: 'rgba(67,76,228,.7)',
+          backgroundColor: '#434ce4',
           borderColor: '#434ce4', borderWidth: 1.5,
           borderRadius: 4, stack: 'delta',
           datalabels: {
