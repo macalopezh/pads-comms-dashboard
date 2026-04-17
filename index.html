@@ -919,7 +919,6 @@ function updateDashboard() {
   // Mostrar/ocultar embudo de atribución
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
   document.getElementById('tgmvAdvCard').style.display = isRet ? 'none' : '';
-  if (!isRet) renderTgmvAdvChart();
   document.getElementById('subscopeMesSection').style.display = isRet ? 'none' : '';
   document.getElementById('touchpointSection').style.display = isRet ? 'block' : 'none';
   document.getElementById('segundaMitadSection').style.display = isRet ? 'block' : 'none';
@@ -1346,6 +1345,11 @@ function renderCharts() {
         }
       }
     });
+  }
+
+  // TGMV Advertiser — solo adquisición, al final cuando todo el DOM ya está visible
+  if (!isRet) {
+    requestAnimationFrame(() => renderTgmvAdvChart());
   }
 }
 
