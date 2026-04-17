@@ -393,10 +393,10 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
   </div>
 
   <!-- Revenue chart — debajo de CVR + Ratio, ancho completo -->
-  <div class="chart-card" style="margin-bottom:16px">
+  <div class="chart-card" id="revenueCard" style="margin-bottom:16px">
     <div class="chart-title">Revenue Incremental Total (USD)</div>
-    <div class="chart-subtitle" id="revSubtitle">Ventana 60d post-trigger · (ratio_trat − ratio_ctrl) × avg_TGMV_cvr × n_conv</div>
-    <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
+    <div class="chart-subtitle" id="revSubtitle">Ventana 60d · (ratio_trat − ratio_ctrl) × avg_TGMV_cvr × n_conv</div>
+    <div class="chart-wrap" style="height:220px"><canvas id="revenueChart"></canvas></div>
   </div>
 
   <!-- Data notes -->
@@ -946,6 +946,7 @@ function updateDashboard() {
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
   document.getElementById('tgmvDeltaCard').style.display = isRet ? 'none' : '';
   document.getElementById('ratioCard').style.display = isRet ? 'none' : '';
+  document.getElementById('revenueCard').style.display = 'block'; // siempre visible (ambos tracks)
   document.getElementById('tgmvAdvCard').style.display = isRet ? 'none' : '';
   document.getElementById('subscopeMesSection').style.display = isRet ? 'none' : '';
   document.getElementById('touchpointSection').style.display = isRet ? 'block' : 'none';
