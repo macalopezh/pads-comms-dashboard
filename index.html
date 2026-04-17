@@ -366,6 +366,16 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
       <div class="chart-subtitle" id="upliftChartSubtitle">Uplift porcentual de conversión por causa de ingreso al track · acumulado</div>
       <div class="chart-wrap tall"><canvas id="upliftChart"></canvas></div>
     </div>
+    <!-- %TGMV Advertiser — solo adquisición -->
+    <div class="chart-card full" id="tgmvAdvCard" style="display:none">
+      <div class="chart-title">Contribución al % TGMV Advertiser</div>
+      <div class="chart-subtitle">
+        % TGMV total que tienen los sellers que activan PAds via comms · Ene–Abr 2026 ·
+        <span style="color:#00A650;font-weight:700">▬ FRAME conv</span> = sellers con revenue en 3d ·
+        <span style="color:#434ce4;font-weight:700">▬ Last-click</span> = GOLD N_conversion=1
+      </div>
+      <div class="chart-wrap tall"><canvas id="tgmvAdvChart"></canvas></div>
+    </div>
     <!-- Embudo de atribución — solo adquisición -->
     <div class="chart-card full" id="attrFunnelCard" style="display:none">
       <div class="chart-title">Embudo de Atribución — Sellers por mes</div>
@@ -752,6 +762,20 @@ const SEGUNDA_MITAD_DATA = [
 ];
 
 // ─────────────────────────────────────────
+// ADQUISICIÓN — Contribución al %TGMV Advertiser
+// pct_tgmv_adv: %TGMV Advertiser total del mercado
+// pct_tgmv_last_click: TGMV de sellers last-click (GOLD) / TGMV total
+// pct_tgmv_frame: TGMV de sellers convertidos FRAME 3d / TGMV total
+// ─────────────────────────────────────────
+// Stock acumulado: para cada mes M, TGMV de sellers activados en ≤ M que siguen publicitando
+const TGMV_ADV_DATA = {
+  labels: ['Ene 2026', 'Feb 2026', 'Mar 2026', 'Abr 2026 †'],
+  pct_tgmv_adv:        [75.43, 76.14, 76.40, 76.24],   // %TGMV Advertiser total del mercado
+  pct_tgmv_last_click: [0.029, 0.089, 0.153, 0.205],   // GOLD N_conversion=1 (stock acum.)
+  pct_tgmv_frame:      [0.201, 0.406, 0.515, 0.559],   // FRAME conv 3d (stock acum.)
+};
+
+// ─────────────────────────────────────────
 // ADQUISICIÓN — Metodología actualizada
 // Tratamiento: sellers con sent_date en TURING_SILVER (S_ambito='Acquisition', S_product='PADS')
 // Control: GROWTH_COMM_TARGET_AUDIENCE_CONTROL filtrado a Lun/Mar/Jue (días de envío)
@@ -894,6 +918,8 @@ function updateDashboard() {
 
   // Mostrar/ocultar embudo de atribución
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
+  document.getElementById('tgmvAdvCard').style.display = isRet ? 'none' : '';
+  if (!isRet) renderTgmvAdvChart();
   document.getElementById('subscopeMesSection').style.display = isRet ? 'none' : '';
   document.getElementById('touchpointSection').style.display = isRet ? 'block' : 'none';
   document.getElementById('segundaMitadSection').style.display = isRet ? 'block' : 'none';
@@ -1948,6 +1974,99 @@ function renderSegundaMitadChart() {
       scales: {
         x: { grid: { display: false } },
         y: { grid: { color: gridColor }, ticks: { callback: v => v + '%' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────
+// ADQUISICIÓN — Gráfico %TGMV Advertiser
+// ─────────────────────────────────────────
+function renderTgmvAdvChart() {
+  const el = document.getElementById('tgmvAdvChart');
+  if (!el) return;
+  if (charts.tgmvAdv) { charts.tgmvAdv.destroy(); delete charts.tgmvAdv; }
+  const gridColor = 'rgba(228,232,240,.5)';
+  const d = TGMV_ADV_DATA;
+
+  charts.tgmvAdv = new Chart(el, {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [
+        {
+          label: '%TGMV Advertiser total',
+          data: d.pct_tgmv_adv,
+          borderColor: '#1C1C28',
+          backgroundColor: 'rgba(28,28,40,.05)',
+          borderWidth: 2.5,
+          pointRadius: 4, pointBackgroundColor: '#1C1C28',
+          fill: true, tension: .3, yAxisID: 'yLeft',
+          datalabels: {
+            display: true, align: 'top', anchor: 'end',
+            formatter: v => v + '%', font: { size: 10, weight: 700 },
+            color: '#1C1C28', padding: 2
+          }
+        },
+        {
+          label: 'Contribución FRAME (stock acum.)',
+          data: d.pct_tgmv_frame,
+          borderColor: '#00A650',
+          backgroundColor: 'rgba(0,166,80,.15)',
+          borderWidth: 2.5,
+          pointRadius: 5, pointBackgroundColor: '#00A650',
+          fill: true, tension: .3, yAxisID: 'yRight',
+          datalabels: {
+            display: true, align: 'top', anchor: 'end',
+            formatter: v => v + '%', font: { size: 10, weight: 700 },
+            color: '#00A650', padding: 2
+          }
+        },
+        {
+          label: 'Contribución Last-click GOLD (stock acum.)',
+          data: d.pct_tgmv_last_click,
+          borderColor: '#434ce4',
+          backgroundColor: 'rgba(67,76,228,.08)',
+          borderWidth: 2,
+          borderDash: [5, 4],
+          pointRadius: 4, pointBackgroundColor: '#434ce4',
+          fill: true, tension: .3, yAxisID: 'yRight',
+          datalabels: {
+            display: true, align: 'bottom', anchor: 'end',
+            formatter: v => v + '%', font: { size: 10, weight: 700 },
+            color: '#434ce4', padding: 2
+          }
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%`
+          }
+        },
+        datalabels: {}
+      },
+      scales: {
+        x: { grid: { display: false } },
+        yLeft: {
+          type: 'linear', position: 'left',
+          grid: { color: gridColor },
+          ticks: { callback: v => v + '%' },
+          min: 70, max: 80,
+          title: { display: true, text: '% TGMV Advertiser total', font: { size: 11 } }
+        },
+        yRight: {
+          type: 'linear', position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: { callback: v => v + '%' },
+          min: 0, max: 0.7,
+          title: { display: true, text: '% TGMV de comms', font: { size: 11 } }
+        }
       }
     }
   });
