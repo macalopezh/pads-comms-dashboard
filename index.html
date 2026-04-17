@@ -356,13 +356,8 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
         </span>
       </div>
     </div>
-    <div class="chart-card">
-      <div class="chart-title">Revenue Incremental Total (USD)</div>
-      <div class="chart-subtitle" id="revSubtitle">Ventana 60d post-trigger vs grupo control · cambiá la ventana arriba</div>
-      <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
-    </div>
     <div class="chart-card" id="ratioCard" style="display:none">
-      <div class="chart-title">Ratio de Penetración REVS/TGMV</div>
+      <div class="chart-title">Ratio Penetración REVS/TGMV</div>
       <div class="chart-subtitle" id="ratioSubtitle">Trat vs Control · ventana 30d</div>
       <div class="chart-wrap"><canvas id="ratioChart"></canvas></div>
     </div>
@@ -395,6 +390,13 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
       <div class="chart-subtitle">Sellers que convirtieron en 3d (FRAME) vs atribuidos a comms por last-click (GOLD) · % de atribución directa por mes</div>
       <div class="chart-wrap tall"><canvas id="attrFunnelChart"></canvas></div>
     </div>
+  </div>
+
+  <!-- Revenue chart — debajo de CVR + Ratio, ancho completo -->
+  <div class="chart-card" style="margin-bottom:16px">
+    <div class="chart-title">Revenue Incremental Total (USD)</div>
+    <div class="chart-subtitle" id="revSubtitle">Ventana 60d post-trigger · (ratio_trat − ratio_ctrl) × avg_TGMV_cvr × n_conv</div>
+    <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
   </div>
 
   <!-- Data notes -->
@@ -810,11 +812,17 @@ const DATA_ADQ = {
     n_control:     [ 22586, 23589, 23526, 27122, 25312],
     n_converted:   [ 7860,  3329,  3209,  1855,   533],
     n_last_click:  [ 3775,   676,  1084,   929,   185],
-    // Ratio de penetración REVS/TGMV (%) en ventana 30d y 60d desde open_date
-    ratio_trat_30d: [1.188, 1.496, 2.431, 2.538, null],
-    ratio_ctrl_30d: [0.602, 0.615, 0.985, 0.609, null],
-    ratio_trat_60d: [1.394, 1.706, 2.861, 2.552, null],
-    ratio_ctrl_60d: [0.959, 1.152, 1.070, 0.868, null],
+    // Ratio penetración REVS/TGMV (%) · 30d y 60d desde open_date
+    ratio_trat_30d: [1.19, 1.50, 2.43, 2.54, null],
+    ratio_ctrl_30d: [0.60, 0.62, 0.99, 0.61, null],
+    ratio_trat_60d: [1.39, 1.71, 2.86, 2.55, null],
+    ratio_ctrl_60d: [0.96, 1.15, 1.07, 0.87, null],
+    // TGMV promedio de sellers que convirtieron (rev>0 en 3d desde open)
+    avg_tgmv_cvr_30d: [null,  4039, 4250, 4020, null],
+    avg_tgmv_cvr_60d: [null,  7480, 8168, 4548, null],
+    // Rev incr = (ratio_trat - ratio_ctrl)/100 × avg_tgmv_cvr × n_cvr
+    rev_incr_30d: [0, 110107, 174465, 75462, 0],
+    rev_incr_60d: [0, 128168, 415280, 74524, 0],
   }
 };
 // Acumulado Dic 2025 – Mar 2026 por sub_scope (opción B: mismo universo partida)
@@ -1036,6 +1044,20 @@ function renderKPIs() {
       </span>
       <div class="kpi-sub">${usersNote}</div>
     </div>
+    ${!isRet ? (() => {
+      // KPI delta ratio penetración — último mes con datos completos
+      const d = DATA_ADQ['mensual'];
+      const rKey30 = 'ratio_trat_30d', cKey30 = 'ratio_ctrl_30d';
+      const lastIdx = d[rKey30].reduce((acc, v, i) => v !== null ? i : acc, 0);
+      const deltaRatio = Math.round((d[rKey30][lastIdx] - d[cKey30][lastIdx]) * 100) / 100;
+      const mesRef = d.labels[lastIdx];
+      return `<div class="kpi-card positive" style="border-top:3px solid #00A650">
+        <div class="kpi-label">Δ Ratio Penetración · ${mesRef}</div>
+        <div class="kpi-value" style="color:#00A650">+${deltaRatio}pp</div>
+        <span class="kpi-delta up">▲ trat ${d[rKey30][lastIdx]}% vs ctrl ${d[cKey30][lastIdx]}%</span>
+        <div class="kpi-sub">REVS/TGMV · 30d desde apertura · stock activado</div>
+      </div>`;
+    })() : ''}
   `;
 }
 
@@ -1147,7 +1169,7 @@ function renderCharts() {
       scales: {
         x: { grid: { display: false }, ticks: { maxRotation: 0 } },
         y: { grid: { color: gridColor }, ticks: { callback: v => v+'%' }, beginAtZero: true,
-             max: isSemRet ? undefined : undefined }
+             grace: '15%' }
       }
     }
   });
@@ -2035,25 +2057,25 @@ function renderRatioChart() {
         {
           label: 'Tratamiento',
           data: ratioTrat,
-          borderColor: '#434ce4', backgroundColor: 'rgba(67,76,228,.08)',
-          borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#434ce4',
+          borderColor: '#00A650', backgroundColor: 'rgba(0,166,80,.08)',
+          borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: '#00A650',
           fill: true, tension: .35, spanGaps: false,
           datalabels: {
             display: ctx => ratioTrat[ctx.dataIndex] !== null,
             align: 'top', anchor: 'end',
-            formatter: v => v + '%', font: { size: 10, weight: 700 }, color: '#434ce4', padding: 2
+            formatter: v => v.toFixed(2) + '%', font: { size: 10, weight: 700 }, color: '#00A650', padding: 2
           }
         },
         {
           label: 'Control',
           data: ratioCtrl,
-          borderColor: '#b5b9d4', backgroundColor: 'rgba(181,185,212,.06)',
-          borderWidth: 2, borderDash: [5,4], pointRadius: 3, pointBackgroundColor: '#b5b9d4',
+          borderColor: '#88cc88', backgroundColor: 'rgba(136,204,136,.06)',
+          borderWidth: 2, borderDash: [5,4], pointRadius: 3, pointBackgroundColor: '#88cc88',
           fill: true, tension: .35, spanGaps: false,
           datalabels: {
             display: ctx => ratioCtrl[ctx.dataIndex] !== null,
             align: 'bottom', anchor: 'end',
-            formatter: v => v + '%', font: { size: 10, weight: 600 }, color: '#888888', padding: 2
+            formatter: v => v.toFixed(2) + '%', font: { size: 10, weight: 600 }, color: '#88cc88', padding: 2
           }
         }
       ]
