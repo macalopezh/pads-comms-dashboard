@@ -376,6 +376,14 @@ select:focus { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
       </div>
       <div class="chart-wrap tall"><canvas id="tgmvAdvChart"></canvas></div>
     </div>
+    <!-- %TGMV Advertiser variación MoM — solo adquisición -->
+    <div class="chart-card full" id="tgmvDeltaCard" style="display:none">
+      <div class="chart-title">Variación MoM del % TGMV Advertiser y contribución de Comms</div>
+      <div class="chart-subtitle">
+        Cambio mes a mes en el %TGMV Adv total · y cuánto de ese cambio es explicado por sellers activados via comms (stock acumulado)
+      </div>
+      <div class="chart-wrap tall"><canvas id="tgmvDeltaChart"></canvas></div>
+    </div>
     <!-- Embudo de atribución — solo adquisición -->
     <div class="chart-card full" id="attrFunnelCard" style="display:none">
       <div class="chart-title">Embudo de Atribución — Sellers por mes</div>
@@ -918,6 +926,7 @@ function updateDashboard() {
 
   // Mostrar/ocultar embudo de atribución
   document.getElementById('attrFunnelCard').style.display = isRet ? 'none' : '';
+  document.getElementById('tgmvDeltaCard').style.display = isRet ? 'none' : '';
   document.getElementById('tgmvAdvCard').style.display = isRet ? 'none' : '';
   document.getElementById('subscopeMesSection').style.display = isRet ? 'none' : '';
   document.getElementById('touchpointSection').style.display = isRet ? 'block' : 'none';
@@ -1347,9 +1356,12 @@ function renderCharts() {
     });
   }
 
-  // TGMV Advertiser — solo adquisición, al final cuando todo el DOM ya está visible
+  // TGMV Advertiser charts — solo adquisición, defer para que el DOM tenga dimensiones
   if (!isRet) {
-    requestAnimationFrame(() => renderTgmvAdvChart());
+    requestAnimationFrame(() => {
+      renderTgmvAdvChart();
+      renderTgmvDeltaChart();
+    });
   }
 }
 
@@ -2056,6 +2068,112 @@ function renderTgmvAdvChart() {
           ticks: { callback: v => v + '%' },
           min: 0, max: 0.7,
           title: { display: true, text: '% TGMV comms', color: '#444', font: { size: 11 } }
+        }
+      }
+    }
+  });
+}
+
+function renderTgmvDeltaChart() {
+  const el = document.getElementById('tgmvDeltaChart');
+  if (!el) return;
+  if (charts.tgmvDelta) { charts.tgmvDelta.destroy(); delete charts.tgmvDelta; }
+  const gridColor = 'rgba(228,232,240,.5)';
+  const d = TGMV_ADV_DATA;
+
+  // Calcular deltas MoM
+  const labels = d.labels.slice(1); // Feb, Mar, Abr (primer mes no tiene delta)
+  const deltaTotal = [], deltaFrame = [], deltaGold = [], resto = [];
+  for (let i = 1; i < d.labels.length; i++) {
+    const dt = Math.round((d.pct_tgmv_adv[i] - d.pct_tgmv_adv[i-1]) * 100) / 100;
+    const df = Math.round((d.pct_tgmv_frame[i] - d.pct_tgmv_frame[i-1]) * 1000) / 1000;
+    const dg = Math.round((d.pct_tgmv_last_click[i] - d.pct_tgmv_last_click[i-1]) * 1000) / 1000;
+    deltaTotal.push(dt);
+    deltaFrame.push(df);
+    deltaGold.push(dg);
+    resto.push(Math.round((dt - df) * 1000) / 1000); // variación no atribuida a comms
+  }
+
+  charts.tgmvDelta = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Resto (orgánico / otros)',
+          data: resto,
+          backgroundColor: resto.map(v => v >= 0 ? 'rgba(170,170,170,.5)' : 'rgba(230,57,70,.3)'),
+          borderColor: resto.map(v => v >= 0 ? '#AAAAAA' : '#E63946'),
+          borderWidth: 1.5,
+          borderRadius: 4,
+          stack: 'delta',
+          datalabels: { display: false }
+        },
+        {
+          label: 'Contribución FRAME conv (stock acum.)',
+          data: deltaFrame,
+          backgroundColor: 'rgba(0,166,80,.7)',
+          borderColor: '#00A650', borderWidth: 1.5,
+          borderRadius: 4, stack: 'delta',
+          datalabels: {
+            display: ctx => Math.abs(ctx.raw) > 0.001,
+            formatter: v => (v > 0 ? '+' : '') + v + 'pp',
+            font: { size: 9, weight: 700 }, color: '#FFFFFF',
+            anchor: 'center', align: 'center'
+          }
+        },
+        {
+          label: 'Contribución Last-click GOLD (stock acum.)',
+          data: deltaGold,
+          backgroundColor: 'rgba(67,76,228,.7)',
+          borderColor: '#434ce4', borderWidth: 1.5,
+          borderRadius: 4, stack: 'delta',
+          datalabels: {
+            display: ctx => Math.abs(ctx.raw) > 0.001,
+            formatter: v => (v > 0 ? '+' : '') + v + 'pp',
+            font: { size: 9, weight: 700 }, color: '#FFFFFF',
+            anchor: 'center', align: 'center'
+          }
+        },
+        {
+          // Línea del delta total como overlay
+          label: 'Δ %TGMV Adv total',
+          data: deltaTotal,
+          type: 'line',
+          borderColor: '#1C1C28',
+          backgroundColor: 'transparent',
+          borderWidth: 2.5,
+          pointRadius: 6, pointBackgroundColor: '#1C1C28',
+          fill: false, tension: 0,
+          stack: undefined,
+          datalabels: {
+            display: true,
+            align: ctx => deltaTotal[ctx.dataIndex] >= 0 ? 'top' : 'bottom',
+            anchor: ctx => deltaTotal[ctx.dataIndex] >= 0 ? 'end' : 'start',
+            formatter: v => (v > 0 ? '+' : '') + v + 'pp',
+            font: { size: 10, weight: 700 }, color: '#1C1C28', padding: 4
+          }
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12, borderRadius: 3, useBorderRadius: true } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw > 0 ? '+' : ''}${ctx.raw}pp`
+          }
+        },
+        datalabels: {}
+      },
+      scales: {
+        x: { grid: { display: false }, stacked: true },
+        y: {
+          grid: { color: gridColor },
+          stacked: true,
+          ticks: { callback: v => (v > 0 ? '+' : '') + v + 'pp' },
+          title: { display: true, text: 'Variación MoM en pp', font: { size: 11 } }
         }
       }
     }
